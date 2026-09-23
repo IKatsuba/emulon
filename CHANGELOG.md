@@ -6,6 +6,12 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-09-23
+
+### Fixed
+
+- `@emulon/polar`: webhook CLI examples pass `--types` as a JSON array.
+
 ## [0.1.0] - 2026-09-23
 
 ### Added

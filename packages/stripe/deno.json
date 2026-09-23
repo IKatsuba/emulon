@@ -1,6 +1,6 @@
 {
   "name": "@emulon/stripe",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "exports": "./src/mod.ts",
   "emulon": {
     "apiVersion": 1,
@@ -12,7 +12,7 @@
     ]
   },
   "peerDependencies": {
-    "emulon": "^0.1.0",
+    "emulon": "^0.1.1",
     "hono": "^4.13.8"
   }
 }
