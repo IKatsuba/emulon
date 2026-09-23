@@ -15,20 +15,18 @@ export async function managerProof(options: {
     await Deno.symlink(`${options.nodeBin}/${name}`, `${bin}/${name}`);
   }
 
-  for (const manager of ['pnpm', 'yarn', 'bun', 'deno'] as const) {
-    let executable: string | undefined;
+  // Some installations ship managers as shell wrappers that resolve their own
+  // location with these utilities; they are not package managers themselves.
+  for (const utility of ['sed', 'readlink', 'dirname', 'uname']) {
+    const executable = await findExecutable(utility);
 
-    for (const directory of (Deno.env.get('PATH') ?? '').split(':')) {
-      try {
-        executable = await Deno.realPath(`${directory}/${manager}`);
-
-        break;
-      } catch (error) {
-        if (!(error instanceof Deno.errors.NotFound)) {
-          throw error;
-        }
-      }
+    if (executable) {
+      await Deno.symlink(executable, `${bin}/${utility}`);
     }
+  }
+
+  for (const manager of ['pnpm', 'yarn', 'bun', 'deno'] as const) {
+    const executable = await findExecutable(manager);
 
     if (!executable) {
       console.log(
@@ -56,5 +54,17 @@ export async function managerProof(options: {
       denoArgs: [],
       manager,
     });
+  }
+}
+
+async function findExecutable(name: string): Promise<string | undefined> {
+  for (const directory of (Deno.env.get('PATH') ?? '').split(':')) {
+    try {
+      return await Deno.realPath(`${directory}/${name}`);
+    } catch (error) {
+      if (!(error instanceof Deno.errors.NotFound)) {
+        throw error;
+      }
+    }
   }
 }

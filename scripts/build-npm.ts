@@ -205,6 +205,7 @@ for (
     pending.push(...cached.dependencies);
 
     const packed = await new Deno.Command('npm', {
+      cwd: await packableCopy(cached.localPath),
       args: [
         'pack',
         '--offline',
@@ -213,7 +214,6 @@ for (
         '--pack-destination',
         output,
       ],
-      cwd: cached.localPath,
       stdout: 'piped',
       stderr: 'inherit',
     }).output();
@@ -233,3 +233,38 @@ await Deno.writeTextFile(
   `${output}/verification-dependencies.json`,
   JSON.stringify(verificationArchives) + '\n',
 );
+
+/**
+ * npm 10 runs `prepare` during `npm pack` despite `--ignore-scripts`, which
+ * builds from sources the published package does not ship. Pack a copy without
+ * lifecycle scripts instead; the packed files are unchanged.
+ */
+async function packableCopy(directory: string): Promise<string> {
+  const manifest = JSON.parse(
+    await Deno.readTextFile(`${directory}/package.json`),
+  );
+
+  if (
+    !['prepack', 'prepare', 'postpack'].some((name) => manifest.scripts?.[name])
+  ) {
+    return directory;
+  }
+
+  const copy = await Deno.makeTempDir({ prefix: 'emulon-pack-' });
+  const copied = await new Deno.Command('cp', {
+    args: ['-R', `${directory}/.`, copy],
+    stderr: 'inherit',
+  }).output();
+
+  if (!copied.success) {
+    throw new Error(`Cannot stage ${manifest.name} for packing`);
+  }
+
+  delete manifest.scripts;
+  await Deno.writeTextFile(
+    `${copy}/package.json`,
+    JSON.stringify(manifest, null, 2) + '\n',
+  );
+
+  return copy;
+}
