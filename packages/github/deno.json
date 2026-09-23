@@ -1,0 +1,19 @@
+{
+  "name": "@emulon/github",
+  "version": "0.1.0",
+  "exports": "./src/mod.ts",
+  "emulon": {
+    "apiVersion": 1,
+    "capabilities": [
+      "http",
+      "reset",
+      "authorization",
+      "events",
+      "webhooks"
+    ]
+  },
+  "peerDependencies": {
+    "emulon": "^0.1.0",
+    "hono": "^4.13.8"
+  }
+}

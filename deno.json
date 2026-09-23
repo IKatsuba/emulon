@@ -1,0 +1,69 @@
+{
+  "workspace": [
+    "./packages/emulon",
+    "./packages/resend",
+    "./packages/github",
+    "./packages/stripe",
+    "./packages/calcom",
+    "./packages/polar"
+  ],
+  "imports": {
+    "@deno/dnt": "jsr:@deno/dnt@^0.43.2",
+    "@types/node": "npm:@types/node@^22.20.4",
+    "zod": "npm:zod@^4",
+    "typescript": "npm:typescript@5.9.3",
+    "resend": "npm:resend@6.28.1",
+    "hono": "npm:hono@4.13.8",
+    "@hono/node-server": "npm:@hono/node-server@2.0.12",
+    "octokit": "npm:octokit@5.0.5",
+    "stripe": "npm:stripe@18.0.0",
+    "@polar-sh/sdk": "npm:@polar-sh/sdk@0.49.0"
+  },
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true
+  },
+  "tasks": {
+    "check": "deno check lint/*.ts scripts/*.ts packages/*/src/mod.ts packages/emulon/src/cli/main.ts packages/*/tests/*.ts packages/emulon/tests/fixtures/*.ts && deno lint && deno fmt --check && deno test --allow-run=deno --allow-read --allow-write '--allow-env=NODE_ENV,TSC_*,NODE_INSPECTOR_IPC,VSCODE_INSPECTOR_OPTIONS' --allow-net=127.0.0.1 && deno task build:npm && deno task verify:dist",
+    "build:npm": "deno run -A scripts/build-npm.ts",
+    "verify:dist": "deno run -A scripts/verify-dist.ts",
+    "example:github-app": "deno run --allow-net=127.0.0.1 --allow-env=NODE_ENV examples/github-app/main.ts"
+  },
+  "fmt": {
+    "lineWidth": 80,
+    "singleQuote": true,
+    "spaceSurroundingProperties": true,
+    "useBraces": "always",
+    "singleBodyPosition": "nextLine",
+    "exclude": [
+      "CLAUDE.md",
+      "AGENTS.md",
+      "docs/design.md"
+    ]
+  },
+  "lint": {
+    "rules": {
+      "tags": [
+        "recommended"
+      ],
+      "include": [
+        "camelcase",
+        "eqeqeq",
+        "no-case-declarations",
+        "no-eval",
+        "no-inferrable-types",
+        "no-node-globals",
+        "no-non-null-asserted-optional-chain",
+        "no-throw-literal",
+        "single-var-declarator"
+      ]
+    },
+    "plugins": [
+      "./lint/style.ts"
+    ]
+  },
+  "exclude": [
+    "dist/"
+  ]
+}
