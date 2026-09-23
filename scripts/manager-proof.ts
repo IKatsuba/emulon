@@ -35,7 +35,13 @@ export async function managerProof(options: {
       continue;
     }
 
-    await Deno.symlink(executable, `${bin}/${manager}`);
+    // Exec the real path: wrappers such as yarn on macOS locate their sources
+    // from $0 without resolving symlinks.
+    await Deno.writeTextFile(
+      `${bin}/${manager}`,
+      `#!/bin/sh\nexec '${executable}' "$@"\n`,
+    );
+    await Deno.chmod(`${bin}/${manager}`, 0o755);
     await addProof({
       cwd,
       archives: options.archives,
