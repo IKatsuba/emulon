@@ -18,7 +18,7 @@ You need [Deno](https://deno.com) 2.9 or later, and Node.js 22.13 or later with
 npm on your `PATH` for the distribution checks.
 
 ```sh
-git clone https://github.com/ikatsuba/emulon.git
+git clone https://github.com/IKatsuba/emulon.git
 cd emulon
 deno task check
 ```
@@ -43,6 +43,8 @@ test talks to a real provider or the public network.
   behavior changes.
 - Add an entry to [`CHANGELOG.md`](CHANGELOG.md) under "Unreleased" for
   user-visible changes.
+
+Maintainers release as described in [`docs/releasing.md`](docs/releasing.md).
 
 ## Reporting bugs
 

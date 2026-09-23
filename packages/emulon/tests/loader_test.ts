@@ -104,7 +104,9 @@ Deno.test('CLI help, version and invalid arguments have structured output', asyn
   assert((await runCLI(['--help'])).stdout.includes('init'));
   assert(
     JSON.parse((await runCLI(['--version', '--json'])).stdout).version ===
-      '0.1.0',
+      JSON.parse(
+        await Deno.readTextFile(new URL('../deno.json', import.meta.url)),
+      ).version,
   );
   assert(
     JSON.parse((await runCLI(['--json', '--help'])).stdout).commands.includes(

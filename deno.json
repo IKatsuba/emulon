@@ -28,6 +28,7 @@
     "check": "deno check lint/*.ts scripts/*.ts packages/*/src/mod.ts packages/emulon/src/cli/main.ts packages/*/tests/*.ts packages/emulon/tests/fixtures/*.ts && deno lint && deno fmt --check && deno test --allow-run=deno --allow-read --allow-write '--allow-env=NODE_ENV,TSC_*,NODE_INSPECTOR_IPC,VSCODE_INSPECTOR_OPTIONS' --allow-net=127.0.0.1 && deno task build:npm && deno task verify:dist",
     "build:npm": "deno run -A scripts/build-npm.ts",
     "verify:dist": "deno run -A scripts/verify-dist.ts",
+    "release": "deno run --allow-read=. --allow-write=. scripts/release.ts",
     "example:github-app": "deno run --allow-net=127.0.0.1 --allow-env=NODE_ENV examples/github-app/main.ts"
   },
   "fmt": {

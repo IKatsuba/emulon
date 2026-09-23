@@ -11,7 +11,7 @@ let a web page interact with a running environment.
 ## Reporting a vulnerability
 
 Please do not open a public issue. Report it privately through
-[GitHub security advisories](https://github.com/ikatsuba/emulon/security/advisories/new).
+[GitHub security advisories](https://github.com/IKatsuba/emulon/security/advisories/new).
 Include the affected versions, a description of the impact and steps to
 reproduce.
 

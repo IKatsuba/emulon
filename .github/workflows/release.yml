@@ -1,0 +1,68 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  check:
+    uses: ./.github/workflows/check.yml
+
+  publish:
+    needs: check
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - name: Verify tag matches package versions
+        run: deno task release verify "$GITHUB_REF_NAME"
+      - name: Build npm archives
+        run: deno task build:npm
+      - name: Publish to npm
+        env:
+          # Trusted publishing (OIDC) is used when configured on npm; the token
+          # is only a fallback for the very first publish of a package.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true'
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          tag=latest
+          case "$version" in *-*) tag=next ;; esac
+          # Core first: plugins declare it as a peer dependency.
+          for name in emulon resend github stripe calcom polar; do
+            package=$(jq -r .name "dist/npm/$name/package.json")
+            if npm view "$package@$version" version >/dev/null 2>&1; then
+              echo "$package@$version is already published"
+              continue
+            fi
+            archive="dist/npm/$(echo "${package#@}" | tr / -)-$version.tgz"
+            npm publish "$archive" --access public --tag "$tag"
+          done
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          deno task --quiet release notes "$version" > notes.md
+          prerelease=
+          case "$version" in *-*) prerelease=--prerelease ;; esac
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 ||
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" \
+              --notes-file notes.md $prerelease

@@ -79,11 +79,11 @@ for (
       license: 'MIT',
       repository: {
         type: 'git',
-        url: 'git+https://github.com/ikatsuba/emulon.git',
+        url: 'git+https://github.com/IKatsuba/emulon.git',
         directory: `packages/${service}`,
       },
-      homepage: 'https://github.com/ikatsuba/emulon#readme',
-      bugs: 'https://github.com/ikatsuba/emulon/issues',
+      homepage: 'https://github.com/IKatsuba/emulon#readme',
+      bugs: 'https://github.com/IKatsuba/emulon/issues',
       engines: { node: '>=22.13.0' },
       devDependencies: {
         '@types/node': workspace.imports['@types/node'].replace(
