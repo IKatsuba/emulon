@@ -16,6 +16,8 @@ free of long-lived publishing credentials.
 - Publish from GitHub Actions with a stored npm automation token.
 - Publish from GitHub Actions through npm trusted publishing (OIDC), with
   provenance attestations.
+- Stage versions from GitHub Actions and let a maintainer approve each with
+  two-factor authentication.
 
 Versioning can be independent per package or shared by all packages.
 
@@ -27,15 +29,21 @@ constant and the changelog in one commit, and a `v<x.y.z>` tag triggers the
 `release` workflow.
 
 The workflow runs the full `check` workflow, verifies that the tag matches every
-package, rebuilds the archives and publishes them core first, skipping versions
+package, rebuilds the archives and stages them core first, skipping versions
 that are already on npm so a failed run can be retried. Versions with a
-prerelease suffix are published under the `next` dist-tag. It then creates a
-GitHub release from the changelog section.
+prerelease suffix are staged under the `next` dist-tag. It then creates a GitHub
+release from the changelog section.
 
-Publishing uses npm trusted publishing with provenance. An `NPM_TOKEN` secret is
-accepted only to bootstrap packages that do not exist on npm yet, because a
-trusted publisher can be configured only for an existing package; the secret is
-removed once every package trusts the workflow.
+CI never makes a version live. The workflow stages each archive with
+`npm stage publish` and provenance, authenticated through npm trusted publishing
+restricted to staging, or through a stage-only access token stored as
+`NPM_TOKEN`. A maintainer reviews the staged versions and promotes each with
+`npm stage approve` and two-factor authentication, so a compromised workflow or
+leaked token cannot publish on its own.
+
+Staging requires the package to exist on npm, so the first version of a new
+package is published directly by a maintainer from the archives built by
+`deno task build:npm`.
 
 ## Consequences
 

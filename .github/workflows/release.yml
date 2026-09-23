@@ -31,14 +31,17 @@ jobs:
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
+      - name: Install npm with staged publishing
+        run: npm install -g npm@latest
       - name: Verify tag matches package versions
         run: deno task release verify "$GITHUB_REF_NAME"
       - name: Build npm archives
         run: deno task build:npm
-      - name: Publish to npm
+      - name: Stage on npm
         env:
-          # Trusted publishing (OIDC) is used when configured on npm; the token
-          # is only a fallback for the very first publish of a package.
+          # Trusted publishing (OIDC) is used when configured on npm; otherwise
+          # a stage-only token. Neither can make a version live: a maintainer
+          # approves every stage with 2FA.
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: 'true'
         run: |
@@ -53,7 +56,7 @@ jobs:
               continue
             fi
             archive="dist/npm/$(echo "${package#@}" | tr / -)-$version.tgz"
-            npm publish "$archive" --access public --tag "$tag"
+            npm stage publish "$archive" --access public --tag "$tag"
           done
       - name: Create GitHub release
         env:
@@ -66,3 +69,4 @@ jobs:
           gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 ||
             gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" \
               --notes-file notes.md $prerelease
+          echo "Approve the staged versions: npm stage list, then npm stage approve <stage-id>" >> "$GITHUB_STEP_SUMMARY"
