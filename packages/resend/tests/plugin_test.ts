@@ -2,6 +2,7 @@ import resend from '@emulon/resend';
 import { defineConfig, definePlugin, type PluginInstance } from 'emulon';
 import { readRegistration } from '../../emulon/src/plugins/define.ts';
 import metadata from '../deno.json' with { type: 'json' };
+import core from '../../emulon/deno.json' with { type: 'json' };
 
 function assert(value: boolean, message = 'Assertion failed'): void {
   if (!value) {
@@ -43,7 +44,7 @@ Deno.test('Resend imports as a separate package and preserves typed configuratio
     JSON.stringify(first.definition.capabilities) ===
       JSON.stringify(metadata.emulon.capabilities),
   );
-  assert(metadata.peerDependencies.emulon === '^0.1.0');
+  assert(metadata.peerDependencies.emulon === `^${core.version}`);
 
   // deno-lint-ignore no-constant-condition
   if (false) {

@@ -222,8 +222,11 @@ for (
       throw new Error(`Cannot pack verification dependency ${id}`);
     }
 
+    const report = JSON.parse(new TextDecoder().decode(packed.stdout));
+
+    // npm 12 keys the report by package name; earlier versions return a list.
     verificationArchives.push(
-      JSON.parse(new TextDecoder().decode(packed.stdout))[0].filename,
+      (Array.isArray(report) ? report[0] : Object.values(report)[0]).filename,
     );
     packedDependencies.add(id);
   }
