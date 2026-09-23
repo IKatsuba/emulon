@@ -50,7 +50,7 @@ emulon billing customers create --email ada@example.test --name Ada \
   --external-id usr_1 --json
 emulon billing customers get --id <uuid> --json
 emulon billing webhooks configure --id app --url http://127.0.0.1:4000/hooks \
-  --secret whsec_local --types customer.created --enabled --json
+  --secret whsec_local --types '["customer.created"]' --enabled --json
 emulon billing webhooks list --json
 emulon billing webhooks inspect <delivery-id> --json
 emulon billing webhooks redeliver <delivery-id> --json
