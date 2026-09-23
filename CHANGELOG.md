@@ -6,6 +6,26 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `@emulon/stripe`: products, one-time prices, coupons, promotion codes, hosted
+  Checkout Sessions with a local payment page, payment intents, charges, refunds
+  and disputes, with `checkout.session.completed`, `checkout.session.expired`,
+  `charge.refunded`, `charge.dispute.created` and `charge.dispute.closed`
+  webhooks. Every POST honors `Idempotency-Key`, lists paginate and `expand[]`
+  resolves related objects.
+- `@emulon/stripe` commands to pay or expire a Checkout Session, refund a charge
+  and open or close a dispute.
+
+### Changed
+
+- `@emulon/stripe` serves Stripe API `2026-04-22.dahlia` instead of
+  `2025-03-31.basil` and is verified with `stripe@22.1.1`. Customers carry the
+  full object and accept `metadata` and `phone`.
+- `@emulon/stripe` exposes a second `web` endpoint and stores state in schema
+  version 2; state saved by earlier versions must be reset.
+- `@emulon/stripe` command failures report the Stripe reason and code.
+
 ## [0.1.2] - 2026-09-23
 
 ### Fixed

@@ -164,7 +164,7 @@ calling plugin setup or opening provider listeners.
 
 The installed Stripe slice creates and reads customers through HTTP and the
 typed SDK. CLI idempotency replay survives graceful shutdown and SIGKILL under
-both runtimes. The official stripe@18.0.0 client is packed separately for
+both runtimes. The official stripe@22.1.1 client is packed separately for
 offline consumer testing and excluded from published product dependencies. The
 combined example below also verifies signed Stripe delivery.
 

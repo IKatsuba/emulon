@@ -19,6 +19,7 @@ import {
 } from '../../emulon/tests/helpers/compatibility.ts';
 
 import { cases as webhookCases } from './webhook_cases.ts';
+import { cases as billingCases } from './billing_cases.ts';
 
 const { cases, register } = caseRegistry(
   'packages/stripe/tests/customers_test.ts',
@@ -62,7 +63,7 @@ function client(api: string, apiKey: string) {
     host: url.hostname,
     port: Number(url.port),
     protocol: 'http',
-    apiVersion: '2025-03-31.basil',
+    apiVersion: '2026-04-22.dahlia',
     httpClient: Stripe.createFetchHttpClient(),
     maxNetworkRetries: 0,
     telemetry: false,
@@ -155,7 +156,7 @@ async function officialClientContract() {
   };
 
   assert(
-    event.id.startsWith('evt_') && event.api_version === '2025-03-31.basil' &&
+    event.id.startsWith('evt_') && event.api_version === '2026-04-22.dahlia' &&
       event.data.object.id === first.id,
   );
 
@@ -176,7 +177,7 @@ async function officialClientContract() {
     });
     const value = await response.json();
 
-    assert(response.headers.get('stripe-version') === '2025-03-31.basil');
+    assert(response.headers.get('stripe-version') === '2026-04-22.dahlia');
 
     return { status: response.status, value };
   };
@@ -204,7 +205,7 @@ async function officialClientContract() {
   for (
     const body of [
       'name=A&name=B',
-      'metadata[a]=b',
+      'metadata=x',
       'expand[]=x',
       'idempotencyKey=x',
       'unknown=x',
@@ -274,10 +275,13 @@ async function officialClientContract() {
 
 Deno.test('Stripe pure rules, expiry boundary, transactional rollback and fixtures', async () => {
   assert(
-    fingerprint({ name: 'A', email: 'B' }) ===
-      fingerprint({ email: 'B', name: 'A' }),
+    fingerprint('POST', '/v1/customers', { name: 'A', email: 'B' }) ===
+      fingerprint('POST', '/v1/customers', { email: 'B', name: 'A' }),
   );
-  assert(fingerprint({ name: '' }) !== fingerprint({}));
+  assert(
+    fingerprint('POST', '/v1/customers', { name: '' }) !==
+      fingerprint('POST', '/v1/customers', {}),
+  );
   assert(!expired(100, 86400099) && expired(100, 86400100));
   assert(
     matchesKey('Bearer sk_test_a', 'sk_test_a') &&
@@ -367,7 +371,7 @@ register(
   'official client, concurrent replay, authentication and strict surface',
   officialClientContract,
 );
-cases.push(...webhookCases);
+cases.push(...webhookCases, ...billingCases);
 verifyCoverage(compatibility, cases);
 
 for (const test of cases) {

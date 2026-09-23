@@ -26,14 +26,14 @@ the same command contract.
 
 ## Packages
 
-| Package                             | Emulates                                               |
-| ----------------------------------- | ------------------------------------------------------ |
-| [`emulon`](packages/emulon)         | CLI, SDK, plugin authoring API and runtime             |
-| [`@emulon/github`](packages/github) | GitHub Apps, installations, user authorization, issues |
-| [`@emulon/resend`](packages/resend) | Resend email sending and reading                       |
-| [`@emulon/stripe`](packages/stripe) | Stripe customers and their webhooks                    |
-| [`@emulon/calcom`](packages/calcom) | Cal.com API v2 event types, availability and bookings  |
-| [`@emulon/polar`](packages/polar)   | Polar customers and their webhooks                     |
+| Package                             | Emulates                                                        |
+| ----------------------------------- | --------------------------------------------------------------- |
+| [`emulon`](packages/emulon)         | CLI, SDK, plugin authoring API and runtime                      |
+| [`@emulon/github`](packages/github) | GitHub Apps, installations, user authorization, issues          |
+| [`@emulon/resend`](packages/resend) | Resend email sending and reading                                |
+| [`@emulon/stripe`](packages/stripe) | Stripe catalog, promotion codes, Checkout, refunds and disputes |
+| [`@emulon/calcom`](packages/calcom) | Cal.com API v2 event types, availability and bookings           |
+| [`@emulon/polar`](packages/polar)   | Polar customers and their webhooks                              |
 
 Packages run on Node.js 22.13 or later and on Deno.
 

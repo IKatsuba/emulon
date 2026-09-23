@@ -1,16 +1,43 @@
+// Stripe API fields are snake_case on the wire.
+// deno-lint-ignore-file camelcase
 import { z } from 'zod';
 import type { DeliveryTransport, SubscriptionPolicy } from 'emulon';
-import { type Customer, customerSchema, version } from '../model/customers.ts';
+import { version } from '../model/core.ts';
+
+export const eventTypes = [
+  'customer.created',
+  'checkout.session.completed',
+  'checkout.session.expired',
+  'charge.refunded',
+  'charge.dispute.created',
+  'charge.dispute.closed',
+] as const;
+
+export type EventType = (typeof eventTypes)[number];
+
+/** The object each event type carries in `data.object`. */
+const objects: Record<EventType, string> = {
+  'customer.created': 'customer',
+  'checkout.session.completed': 'checkout.session',
+  'checkout.session.expired': 'checkout.session',
+  'charge.refunded': 'charge',
+  'charge.dispute.created': 'dispute',
+  'charge.dispute.closed': 'dispute',
+};
 
 export interface StripeEvent {
   id: string;
   object: 'event';
-  // deno-lint-ignore camelcase
-  api_version: '2025-03-31.basil';
+  api_version: typeof version;
   created: number;
-  type: 'customer.created';
+  data: {
+    object: Record<string, unknown>;
+    previous_attributes?: Record<string, unknown>;
+  };
   livemode: false;
-  data: { object: Customer };
+  pending_webhooks: number;
+  request: { id: string | null; idempotency_key: string | null };
+  type: EventType;
 }
 
 export const eventSchema: z.ZodType<StripeEvent, StripeEvent> = z.strictObject({
@@ -18,13 +45,24 @@ export const eventSchema: z.ZodType<StripeEvent, StripeEvent> = z.strictObject({
   object: z.literal('event'),
   api_version: z.literal(version),
   created: z.number().int().nonnegative(),
-  type: z.literal('customer.created'),
+  data: z.strictObject({
+    object: z.looseObject({ id: z.string(), object: z.string() }),
+    previous_attributes: z.record(z.string(), z.unknown()).optional(),
+  }),
   livemode: z.literal(false),
-  data: z.strictObject({ object: customerSchema }),
-});
+  pending_webhooks: z.number().int().nonnegative(),
+  request: z.strictObject({
+    id: z.string().nullable(),
+    idempotency_key: z.string().nullable(),
+  }),
+  type: z.enum(eventTypes),
+}).refine((event) => event.data.object.object === objects[event.type], {
+  message: 'Event object does not match its type.',
+}) as unknown as z.ZodType<StripeEvent, StripeEvent>;
+
 export const subscriptionPolicy: SubscriptionPolicy = {
   selection: 'processing-time',
-  eventTypes: ['customer.created'],
+  eventTypes: [...eventTypes],
 };
 
 export function retryDelayMs(attempt: number): number | undefined {

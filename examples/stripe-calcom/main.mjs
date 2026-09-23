@@ -153,7 +153,7 @@ try {
     host: endpoint.hostname,
     port: Number(endpoint.port),
     protocol: 'http',
-    apiVersion: '2025-03-31.basil',
+    apiVersion: '2026-04-22.dahlia',
     httpClient: Stripe.createFetchHttpClient(),
     maxNetworkRetries: 0,
     telemetry: false,
@@ -363,7 +363,7 @@ try {
 
   await closed(endpoints);
   console.log(
-    'CLI/connected SDK, stripe@18.0.0, Cal.com HTTP, six independently signed deliveries, manifest parity and private listener release passed',
+    'CLI/connected SDK, stripe@22.1.1, Cal.com HTTP, six independently signed deliveries, manifest parity and private listener release passed',
   );
 } finally {
   await connected?.dispose();

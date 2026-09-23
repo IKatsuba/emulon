@@ -526,6 +526,7 @@ Implemented, in delivery order:
 5. Add GitHub browser user authorization.
 6. Implement the bounded Stripe and Cal.com slices in [ADR 0029](decisions/0029-stripe-initial-slice.md) and [ADR 0030](decisions/0030-calcom-initial-slice.md), using the shared compatibility manifest in [ADR 0028](decisions/0028-compatibility-manifest.md). [ADR 0031](decisions/0031-stripe-calcom-implementation-order.md) defines the implementation order and shared mechanics.
 7. Implement the bounded Polar customer and signed-delivery slice in [ADR 0033](decisions/0033-polar-initial-slice.md).
+8. Extend Stripe to catalog, discounts, hosted Checkout, refunds and disputes in [ADR 0035](decisions/0035-stripe-checkout-and-payments.md).
 
 Future work: S3, Upstash and CRM plugins.
 
@@ -535,7 +536,7 @@ Implementation decisions and their status:
 - Command schema integration for SDK types and CLI metadata (Zod v4 is selected in [ADR 0002](decisions/0002-schema-library.md)).
 - Durable storage uses built-in SQLite as selected in [ADR 0016](decisions/0016-durable-state.md); host lifecycle integration is implemented; independent process-kill recovery tests are described in [delivery verification](events-and-delivery.md). Version mismatches are rejected; migrations remain future work.
 - Configuration loader is selected in [ADR 0003](decisions/0003-config-loader.md); package-manager selection and safe `add` configuration edits are selected in [ADR 0032](decisions/0032-plugin-add.md).
-- Exact initial provider API versions and operation coverage are selected in [ADR 0028](decisions/0028-compatibility-manifest.md), [ADR 0029](decisions/0029-stripe-initial-slice.md), [ADR 0030](decisions/0030-calcom-initial-slice.md), and [ADR 0033](decisions/0033-polar-initial-slice.md). These are implementation targets; only tested entries ship as supported.
+- Exact initial provider API versions and operation coverage are selected in [ADR 0028](decisions/0028-compatibility-manifest.md), [ADR 0029](decisions/0029-stripe-initial-slice.md), [ADR 0030](decisions/0030-calcom-initial-slice.md), [ADR 0033](decisions/0033-polar-initial-slice.md), and [ADR 0035](decisions/0035-stripe-checkout-and-payments.md). These are implementation targets; only tested entries ship as supported.
 
 These do not change the confirmed product decisions. Remaining open items, such as storage migrations, should be settled before a broad plugin rollout.
 

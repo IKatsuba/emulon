@@ -1189,7 +1189,7 @@ void mail;
 const commandConfig = defineConfig({ services: { stripe: stripe(), mail: resend(), github: github() } });
 const commandStarted = await Emulon.start(commandConfig);
 const commandConnected = await Emulon.connect({ config: commandConfig });
-const stripeData = { id: "evt_typed", object: "event" as const, api_version: "2025-03-31.basil" as const, created: 1, type: "customer.created" as const, livemode: false as const, data: { object: { id: "cus_typed", object: "customer" as const, created: 1, livemode: false as const, name: null, email: null, description: null, metadata: {} } } };
+const stripeData = { id: "evt_typed", object: "event" as const, api_version: "2026-04-22.dahlia" as const, created: 1, type: "customer.created" as const, livemode: false as const, pending_webhooks: 0, request: { id: null, idempotency_key: null }, data: { object: { id: "cus_typed", object: "customer" as const, created: 1, livemode: false as const, name: null, email: null, description: null, metadata: {} } } };
 const mailData = { email_id: "00000000-0000-4000-8000-000000000001", from: "a@example.test", to: ["b@example.test"], subject: "Typed" };
 const githubData = { issue: { id: 1, number: 1, title: "Typed" }, repository: { id: 1, name: "demo", full_name: "owner/demo", private: false }, sender: { id: 1, login: "owner", type: "User" as const } };
 for (const client of [commandStarted, commandConnected]) {
@@ -1214,7 +1214,7 @@ for (const client of [commandStarted, commandConnected]) {
   // @ts-expect-error stripe webhooks.send rejects invalid command input.
   client.services.stripe.webhooks.send({ type: "customer.created", data: stripeData });
   // @ts-expect-error stripe events.publish rejects invalid command input.
-  client.services.stripe.events.publish({ type: "customer.created", data: { ...stripeData, data: { object: { ...stripeData.data.object, id: 123 } } } });
+  client.services.stripe.events.publish({ type: "customer.created", data: { ...stripeData, pending_webhooks: "0" } });
   // @ts-expect-error stripe events.publish rejects invalid command input.
   client.services.stripe.events.publish({ type: "unsupported", data: stripeData });
   // @ts-expect-error stripe webhooks.configure rejects invalid command input.

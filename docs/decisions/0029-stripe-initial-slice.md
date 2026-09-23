@@ -1,5 +1,9 @@
 # 0029: Stripe customers, idempotency and signed events
 
+Status: Accepted. [ADR 0035](0035-stripe-checkout-and-payments.md) supersedes
+the resource scope, pinned version and official client below; idempotency,
+signing and delivery decisions stand.
+
 ## Context
 
 The first Stripe plugin needs the smallest useful provider slice proving the

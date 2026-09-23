@@ -1,7 +1,7 @@
 # Stripe and Cal.com from installed npm archives
 
 This example exercises one project host with both plugins through the CLI,
-connected SDK, official `stripe@18.0.0` client and Cal.com API v2 `fetch` calls.
+connected SDK, official `stripe@22.1.1` client and Cal.com API v2 `fetch` calls.
 It creates three customers and three bookings, verifies six webhook bodies with
 independent HMAC computations (plus Stripe's official verifier), compares
 CLI/SDK manifests to installed package metadata, and starts a separate private
@@ -42,7 +42,7 @@ checked with TypeScript and additionally with `deno check` for Deno.
 ## Run the consumer example yourself
 
 In a separate npm project, install the built `emulon`, `@emulon/stripe`,
-`@emulon/calcom` archives and `stripe@18.0.0` with their dependencies, then copy
+`@emulon/calcom` archives and `stripe@22.1.1` with their dependencies, then copy
 `main.mjs` into that project. Initialize and add the plugins (configure a local
 registry or offline cache if reproducing without public access):
 

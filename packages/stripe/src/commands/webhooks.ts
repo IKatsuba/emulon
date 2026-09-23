@@ -20,12 +20,17 @@ import {
 import { subscriptionPolicy } from '../webhooks/mod.ts';
 import { defineCommand, type EventRecord } from 'emulon';
 import { z } from 'zod';
-import { eventSchema, type StripeEvent } from '../webhooks/mod.ts';
+import {
+  eventSchema,
+  type EventType,
+  eventTypes,
+  type StripeEvent,
+} from '../webhooks/mod.ts';
 
 type Operation<Input, Output> = ReturnType<
   typeof defineCommand<z.ZodType<Input, Input>, z.ZodType<Output>>
 >;
-type PublishInput = { type: 'customer.created'; data: StripeEvent };
+type PublishInput = { type: EventType; data: StripeEvent };
 export type Commands = {
   'webhooks.configure': Operation<Destination, Omit<Destination, 'secret'>>;
   'webhooks.destinations': Operation<
@@ -49,11 +54,13 @@ export type Commands = {
 export const commands: Commands = {
   'webhooks.send': defineCommand({
     description:
-      'Send a direct webhook without changing customers or selecting subscriptions',
+      'Send a direct webhook without changing state or selecting subscriptions',
     input: z.strictObject({
-      type: z.literal('customer.created'),
+      type: z.enum(eventTypes),
       data: eventSchema,
       destination: z.string().min(1),
+    }).refine((input) => input.type === input.data.type, {
+      message: 'The type must match data.type.',
     }),
     output: deliverySchema,
     cli: {
@@ -135,11 +142,12 @@ export const commands: Commands = {
     execute: (ctx) => listDeliveries(ctx.store),
   }),
   'events.publish': defineCommand({
-    description:
-      'Publish a synthetic customer event without changing customers',
+    description: 'Publish a synthetic event without changing state',
     input: z.strictObject({
-      type: z.literal('customer.created'),
+      type: z.enum(eventTypes),
       data: eventSchema,
+    }).refine((input) => input.type === input.data.type, {
+      message: 'The type must match data.type.',
     }),
     output: z.object({
       id: z.string(),

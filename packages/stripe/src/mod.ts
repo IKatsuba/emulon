@@ -4,7 +4,8 @@ import { definePlugin, destinationFixture } from 'emulon';
 import { type Commands, commands } from './commands/mod.ts';
 import { fixtures, type Options } from './model/customers.ts';
 import { compatibility } from './compatibility.ts';
-import { routes } from './routes/customers.ts';
+import { routes } from './routes/api.ts';
+import { checkoutPage } from './routes/checkout-page.ts';
 
 import { subscriptionPolicy, transport } from './webhooks/mod.ts';
 
@@ -30,7 +31,7 @@ const stripe: ReturnType<
   transport,
   state: {
     pluginVersion: '0.1.0',
-    schemaVersion: 1,
+    schemaVersion: 2,
     fixtures: (options) => {
       const destinations = options?.destinations ?? [];
 
@@ -45,12 +46,22 @@ const stripe: ReturnType<
     },
   },
   async setup(ctx) {
-    routes(ctx, ctx.http.surface('api'));
+    let web = '';
+
+    // Session URLs name the hosted page, which listens only after routing.
+    routes(
+      ctx,
+      ctx.http.surface('api'),
+      (id) => `${web}/c/pay/${encodeURIComponent(id)}`,
+    );
+    checkoutPage(ctx, ctx.http.surface('web'));
 
     const api = await ctx.http.listen('api');
 
+    web = await ctx.http.listen('web');
+
     return {
-      endpoints: { api },
+      endpoints: { api, web },
       ready: () => Promise.resolve(),
       stop: () => Promise.resolve(),
     };

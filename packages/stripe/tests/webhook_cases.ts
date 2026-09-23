@@ -52,6 +52,8 @@ const event = eventSchema.parse({
   created: 1700000000,
   type: 'customer.created',
   livemode: false,
+  pending_webhooks: 1,
+  request: { id: null, idempotency_key: null },
   data: { object: makeCustomer({}, 'cus_synthetic', 1700000000000) },
 });
 

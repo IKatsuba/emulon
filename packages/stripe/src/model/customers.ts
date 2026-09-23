@@ -1,69 +1,107 @@
+// Stripe API fields are snake_case on the wire.
+// deno-lint-ignore-file camelcase
 import { z } from 'zod';
-import type { Destination, PluginContext } from 'emulon';
+import type { Destination } from 'emulon';
+import { invalidRequest } from '../errors.ts';
+import type { Fields } from '../http/fields.ts';
+import type { Params } from '../http/form.ts';
+import {
+  idempotent,
+  load,
+  type Metadata,
+  randomId,
+  save,
+  seconds,
+  type Store,
+  type Transaction,
+} from './core.ts';
+import { emit } from './core.ts';
 
-export const version = '2025-03-31.basil';
-export const createInput: z.ZodType<CreateInput, CreateInput> = z.strictObject({
-  name: z.string().optional(),
-  email: z.string().optional(),
-  description: z.string().optional(),
-  idempotencyKey: z.string().min(1).max(255).optional(),
-});
+export { version } from './core.ts';
 
 export interface CreateInput {
   name?: string | undefined;
   email?: string | undefined;
   description?: string | undefined;
+  phone?: string | undefined;
+  metadata?: Metadata | undefined;
   idempotencyKey?: string | undefined;
 }
 
-export const customerSchema: z.ZodType<Customer, Customer> = z.strictObject({
-  id: z.string(),
-  object: z.literal('customer'),
-  created: z.number().int(),
-  livemode: z.literal(false),
-  name: z.string().nullable(),
-  email: z.string().nullable(),
-  description: z.string().nullable(),
-  metadata: z.strictObject({}),
+const metadataInput = z.record(z.string().max(40), z.string().max(500))
+  .refine((value) => Object.keys(value).length <= 50);
+
+export const createInput: z.ZodType<CreateInput, CreateInput> = z.strictObject({
+  name: z.string().max(256).optional(),
+  email: z.string().max(512).optional(),
+  description: z.string().max(350).optional(),
+  phone: z.string().max(20).optional(),
+  metadata: metadataInput.optional(),
+  idempotencyKey: z.string().min(1).max(255).optional(),
 });
 
 export interface Customer {
   id: string;
   object: 'customer';
+  address: null;
+  balance: number;
   created: number;
-  livemode: false;
-  name: string | null;
-  email: string | null;
+  currency: string | null;
+  default_source: null;
+  delinquent: boolean;
   description: string | null;
-  metadata: Record<string, never>;
+  discount: null;
+  email: string | null;
+  invoice_prefix: string;
+  invoice_settings: {
+    custom_fields: null;
+    default_payment_method: null;
+    footer: null;
+    rendering_options: null;
+  };
+  livemode: false;
+  metadata: Metadata;
+  name: string | null;
+  next_invoice_sequence: number;
+  phone: string | null;
+  preferred_locales: string[];
+  shipping: null;
+  tax_exempt: 'none';
+  test_clock: null;
 }
-type Store = PluginContext['store'];
+
+export const customerSchema: z.ZodType<Customer, Customer> = z.looseObject({
+  id: z.string(),
+  object: z.literal('customer'),
+  created: z.number().int(),
+  email: z.string().nullable(),
+  name: z.string().nullable(),
+  description: z.string().nullable(),
+  metadata: z.record(z.string(), z.string()),
+}) as unknown as z.ZodType<Customer, Customer>;
+
 export type Options = {
   destinations?: Destination[];
   fixtures?: {
     customers?: (Omit<CreateInput, 'idempotencyKey'> & { id?: string })[];
   };
 };
-export class StripeError extends Error {
-  constructor(
-    public status: number,
-    public type: string,
-    message: string,
-    public code?: string,
-  ) {
-    super(message);
-  }
-}
 
-export function fingerprint(input: CreateInput): string {
-  return JSON.stringify([
-    'POST',
-    '/v1/customers',
-    version,
-    ...['name', 'email', 'description'].map((key) =>
-      input[key as keyof CreateInput] ?? null
-    ),
-  ]);
+/** Canonical request identity, shared by HTTP and control commands. */
+export function fingerprint(method: string, path: string, params: Params) {
+  const canonical = (value: unknown): unknown =>
+    value !== null && typeof value === 'object' && !Array.isArray(value)
+      ? Object.fromEntries(
+        Object.keys(value).sort().map((key) => [
+          key,
+          canonical((value as Record<string, unknown>)[key]),
+        ]),
+      )
+      : Array.isArray(value)
+      ? value.map(canonical)
+      : value;
+
+  return JSON.stringify([method, path, canonical(params)]);
 }
 
 export function expired(created: number, now: number): boolean {
@@ -71,115 +109,112 @@ export function expired(created: number, now: number): boolean {
 }
 
 export function makeCustomer(
-  input: CreateInput,
+  input: Omit<CreateInput, 'idempotencyKey'>,
   id: string,
   now: number,
 ): Customer {
   return {
     id,
     object: 'customer',
-    created: Math.floor(now / 1000),
-    livemode: false,
-    name: input.name ?? null,
-    email: input.email ?? null,
+    address: null,
+    balance: 0,
+    created: seconds(now),
+    currency: null,
+    default_source: null,
+    delinquent: false,
     description: input.description ?? null,
-    metadata: {},
+    discount: null,
+    email: input.email ?? null,
+    invoice_prefix: randomId('', 8).toUpperCase(),
+    invoice_settings: {
+      custom_fields: null,
+      default_payment_method: null,
+      footer: null,
+      rendering_options: null,
+    },
+    livemode: false,
+    metadata: input.metadata ?? {},
+    name: input.name ?? null,
+    next_invoice_sequence: 1,
+    phone: input.phone ?? null,
+    preferred_locales: [],
+    shipping: null,
+    tax_exempt: 'none',
+    test_clock: null,
   };
 }
 
-const savedSchema = z.object({
-  fingerprint: z.string(),
-  created: z.number(),
-  status: z.literal(200),
-  body: customerSchema,
-});
+/** The form parameters a command input corresponds to. */
+export function customerParams(input: CreateInput): Params {
+  const params: Params = {};
+
+  for (const key of ['name', 'email', 'description', 'phone'] as const) {
+    if (input[key] !== undefined) {
+      params[key] = input[key]!;
+    }
+  }
+
+  if (input.metadata !== undefined) {
+    params.metadata = { ...input.metadata };
+  }
+
+  return params;
+}
+
+export function readCustomerFields(fields: Fields): CreateInput {
+  const input: CreateInput = {
+    name: fields.string('name', { max: 256 }),
+    email: fields.string('email', { max: 512 }),
+    description: fields.string('description', { max: 350 }),
+    phone: fields.string('phone', { max: 20 }),
+    metadata: fields.metadata(),
+  };
+
+  fields.done();
+
+  return Object.fromEntries(
+    Object.entries(input).filter(([, value]) => value !== undefined),
+  );
+}
+
+export async function insertCustomer(
+  tx: Transaction,
+  input: Omit<CreateInput, 'idempotencyKey'>,
+  now: number,
+): Promise<Customer> {
+  const customer = makeCustomer(input, randomId('cus_', 14), now);
+
+  await save(tx, customer);
+  await emit(tx, 'customer.created', customer, now);
+
+  return customer;
+}
 
 export function createCustomer(
   store: Store,
   raw: CreateInput,
   now: () => number = Date.now,
 ): Promise<Customer> {
-  const input = createInput.parse(raw);
+  const parsed = createInput.safeParse(raw);
 
-  return store.transaction(async (tx) => {
-    const time = now();
-    const key = input.idempotencyKey;
-    const hash = fingerprint(input);
+  if (!parsed.success) {
+    return Promise.reject(invalidRequest('Invalid customer input.'));
+  }
 
-    if (key !== undefined) {
-      const value = await tx.get('idempotency', key);
+  const { idempotencyKey, ...input } = parsed.data;
+  const time = now();
 
-      if (value !== undefined) {
-        const saved = savedSchema.parse(value);
-
-        if (!expired(saved.created, time)) {
-          if (saved.fingerprint !== hash) {
-            throw new StripeError(
-              400,
-              'idempotency_error',
-              'Idempotency key was used with different parameters.',
-            );
-          }
-
-          return saved.body;
-        }
-      }
-    }
-
-    const customer = makeCustomer(
-      input,
-      'cus_' + crypto.randomUUID().replaceAll('-', ''),
-      time,
-    );
-
-    await tx.put({ collection: 'customers', id: customer.id, value: customer });
-    await tx.record({
-      type: 'customer.created',
-      occurredAt: new Date(time).toISOString(),
-      origin: 'service',
-      payload: {
-        id: 'evt_' + crypto.randomUUID().replaceAll('-', ''),
-        object: 'event',
-        api_version: version,
-        created: customer.created,
-        type: 'customer.created',
-        livemode: false,
-        data: { object: customer },
-      },
-    });
-
-    if (key !== undefined) {
-      await tx.put({
-        collection: 'idempotency',
-        id: key,
-        value: {
-          fingerprint: hash,
-          created: time,
-          status: 200,
-          body: customer,
-        },
-      });
-    }
-
-    return customer;
-  });
+  return idempotent(
+    store,
+    idempotencyKey,
+    fingerprint('POST', '/v1/customers', customerParams(input)),
+    time,
+    (tx) => insertCustomer(tx, input, time),
+  );
 }
 
 export function getCustomer(store: Store, id: string): Promise<Customer> {
-  return store.transaction(async (tx) => {
-    const value = await tx.get('customers', id);
-
-    if (value === undefined) {
-      throw new StripeError(
-        404,
-        'invalid_request_error',
-        'Customer not found.',
-        'resource_missing',
-      );
-    }
-
-    return customerSchema.parse(value);
-  });
+  return store.transaction((tx) => load<Customer>(tx, 'customer', id));
 }
 
 export function fixtures(
@@ -188,17 +223,23 @@ export function fixtures(
   const ids = new Set<string>();
 
   return (options?.fixtures?.customers ?? []).map(
-    ({ id = 'cus_' + crypto.randomUUID().replaceAll('-', ''), ...input }) => {
+    ({ id = randomId('cus_', 14), ...input }) => {
       if (!/^cus_[a-zA-Z0-9]+$/.test(id) || ids.has(id)) {
         throw new Error('Invalid fixture customer ID.');
       }
 
       ids.add(id);
 
+      const parsed = createInput.safeParse(input);
+
+      if (!parsed.success || parsed.data.idempotencyKey !== undefined) {
+        throw new Error('Invalid fixture customer.');
+      }
+
       return {
         collection: 'customers',
         id,
-        value: makeCustomer(createInput.parse(input), id, Date.now()),
+        value: makeCustomer(parsed.data, id, Date.now()),
       };
     },
   );
