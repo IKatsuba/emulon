@@ -33,7 +33,8 @@ export function resolveVersions(
     );
   }
 
-  const versions = requested as string[];
+  // A copy: the caller's options cannot change a started instance.
+  const versions = [...requested] as string[];
 
   if (new Set(versions).size !== versions.length) {
     throw new Error('apiVersions must not repeat a version.');

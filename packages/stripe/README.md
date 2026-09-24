@@ -55,8 +55,9 @@ webhook endpoint receives events in its own pinned version. Commands that return
 Stripe objects accept `apiVersion` (`--api-version` on the CLI) and otherwise
 use the account default.
 
-If saved state still uses a version you remove from `apiVersions`, the instance
-refuses to start; enable the version again or run `emulon reset`.
+If saved events, webhook endpoints or past deliveries still use a version you
+remove from `apiVersions`, the instance refuses to start; enable the version
+again or run `emulon reset`.
 
 ## Sell something
 

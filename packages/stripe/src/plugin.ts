@@ -22,6 +22,7 @@ import type { StripeVersionModule } from './versions/types.ts';
 import {
   endpointVersion,
   presentation,
+  snapshotVersion,
   subscriptionPolicy,
   transport,
 } from './webhooks/mod.ts';
@@ -56,7 +57,7 @@ export type Plugin = ReturnType<
 >;
 
 /**
- * Refuse to start when retained events or endpoints use a version this
+ * Refuse to start when retained events, endpoints or deliveries use a version this
  * instance no longer enables, instead of silently changing their projection.
  */
 async function recordSelection(ctx: PluginContext, config: VersionConfig) {
@@ -69,6 +70,11 @@ async function recordSelection(ctx: PluginContext, config: VersionConfig) {
 
     for (const row of await tx.list('emulon.destinations')) {
       referenced.add(endpointVersion(row.value as Destination));
+    }
+
+    // A delivery keeps the version its endpoint had when it was enqueued.
+    for (const row of await tx.list('emulon.delivery-snapshots')) {
+      referenced.add(snapshotVersion(row.value));
     }
 
     if ([...referenced].some((id) => !config.versions.includes(id))) {

@@ -71,6 +71,22 @@ export function endpointVersion(
   return version;
 }
 
+/** The API version a captured delivery body was projected in. */
+export function snapshotVersion(snapshot: unknown): string {
+  const bytes = (snapshot as { bytes?: unknown } | undefined)?.bytes;
+  const version = Array.isArray(bytes)
+    ? (JSON.parse(new TextDecoder().decode(new Uint8Array(bytes))) as {
+      'api_version'?: unknown;
+    }).api_version
+    : undefined;
+
+  if (typeof version !== 'string') {
+    throw new Error('Webhook delivery has no API version.');
+  }
+
+  return version;
+}
+
 function body(
   module: StripeVersionModule | undefined,
   event: EventRecord,

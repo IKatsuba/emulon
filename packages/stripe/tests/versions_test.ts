@@ -162,6 +162,15 @@ Deno.test('Stripe API version options resolve against installed modules', () => 
       .defaultVersion === TEST,
   );
 
+  // The resolved selection does not alias the caller's options.
+  const requested = [DAHLIA, TEST];
+  const resolved = resolve({
+    apiVersions: requested as Options['apiVersions'],
+  });
+
+  requested.pop();
+  assert(resolved.versions.length === 2 && resolved.versions[1] === TEST);
+
   for (
     const options of [
       { apiVersions: [] },
@@ -349,13 +358,17 @@ Deno.test('Stripe serves the account default without Stripe-Version and each ena
   // Commands show objects in their requested version or the default; the
   // events they cause are viewed in the account default.
   const service = env.services.stripe;
+  // Results are typed as dahlia; the test version adds `test_view`.
+  const testView = (object: object) =>
+    (object as { test_view?: boolean }).test_view;
 
   assert(
-    (await service.customers.get({ id: pinned.value.id })).test_view === true,
+    testView(await service.customers.get({ id: pinned.value.id })) === true,
   );
   assert(
-    (await service.customers.get({ id: pinned.value.id, apiVersion: DAHLIA }))
-      .test_view === undefined,
+    testView(
+      await service.customers.get({ id: pinned.value.id, apiVersion: DAHLIA }),
+    ) === undefined,
   );
 
   const commanded = await service.customers.create({
@@ -363,7 +376,10 @@ Deno.test('Stripe serves the account default without Stripe-Version and each ena
     apiVersion: DAHLIA,
   });
 
-  assert(commanded.test_view === undefined);
+  assert(testView(commanded) === undefined);
+  // @ts-expect-error Command results keep the SDK's dahlia types.
+  commanded.email satisfies number;
+  commanded.email satisfies string | null;
   assert(
     ((await env.events.list({})).at(-1)!.payload as { api_version: string })
       .api_version === TEST,
@@ -737,6 +753,69 @@ Deno.test('Stripe refuses to start without a version its retained state uses', a
     } finally {
       await Deno.remove(directory, { recursive: true });
     }
+  }
+});
+
+Deno.test('Stripe refuses to start without the version of a retained delivery', async () => {
+  const directory = await Deno.makeTempDir();
+  await using sink = receiver();
+  const destination = {
+    id: 'app',
+    url: sink.url('/app'),
+    secret: 'whsec_history',
+    types: ['customer.created'],
+    enabled: true,
+  };
+  const enabled = {
+    services: {
+      stripe: both({
+        apiVersions: [DAHLIA, TEST],
+        destinations: [{ ...destination, apiVersion: TEST }],
+      } as Options),
+    },
+  };
+  let host = await serveEnvironment(enabled, { directory });
+
+  try {
+    await using env = await Emulon.connect({ config: enabled, directory });
+
+    await env.services.stripe.customers.create({ name: 'Ada' });
+
+    const [delivery] = await env.services.stripe.webhooks.list({});
+
+    await env.services.stripe.webhooks.wait({
+      id: delivery!.id,
+      status: 'succeeded',
+      timeout: '5s',
+    });
+    // Only the delivery still names TEST: the endpoint moves to dahlia and
+    // the event was caused in the account default.
+    await env.services.stripe.webhooks.configure({
+      ...destination,
+      apiVersion: DAHLIA,
+    });
+  } finally {
+    await host[Symbol.asyncDispose]();
+  }
+
+  try {
+    assert(JSON.parse(sink.bodies[0]!.body).api_version === TEST);
+
+    const error = await rejects(() =>
+      serveEnvironment({ services: { stripe: both() } }, { directory })
+    );
+
+    assert(
+      error instanceof CommandError && error.code === 'ENVIRONMENT_FAILED',
+      `${error}`,
+    );
+
+    // Enabling it again reopens the same state.
+    host = await serveEnvironment(enabled, { directory });
+
+    await host[Symbol.asyncDispose]();
+  } finally {
+    await Deno.remove(directory, { recursive: true });
   }
 });
 

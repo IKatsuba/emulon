@@ -12,10 +12,11 @@ import type {
   Refund,
 } from '../../model/payments.ts';
 import { expandPaths } from '../common.ts';
+import type * as Dahlia from './wire.ts';
 
 type Wire = Record<string, unknown>;
 
-function customer(r: Customer): Wire {
+function customer(r: Customer): Dahlia.Customer {
   return {
     id: r.id,
     object: 'customer',
@@ -136,7 +137,7 @@ function promotionCode(r: PromotionCodeView): Wire {
   };
 }
 
-function session(r: CheckoutSession): Wire {
+function session(r: CheckoutSession): Dahlia.CheckoutSession {
   return {
     id: r.id,
     object: 'checkout.session',
@@ -194,7 +195,7 @@ function lineItem(r: LineItem): Wire {
   };
 }
 
-function paymentIntent(r: PaymentIntent): Wire {
+function paymentIntent(r: PaymentIntent): Dahlia.PaymentIntent {
   return {
     id: r.id,
     object: 'payment_intent',
@@ -218,7 +219,7 @@ function paymentIntent(r: PaymentIntent): Wire {
   };
 }
 
-function charge(r: Charge): Wire {
+function charge(r: Charge): Dahlia.Charge {
   return {
     id: r.id,
     object: 'charge',
@@ -258,7 +259,7 @@ function charge(r: Charge): Wire {
   };
 }
 
-function refund(r: Refund): Wire {
+function refund(r: Refund): Dahlia.Refund {
   return {
     id: r.id,
     object: 'refund',
@@ -273,7 +274,7 @@ function refund(r: Refund): Wire {
   };
 }
 
-function dispute(r: Dispute): Wire {
+function dispute(r: Dispute): Dahlia.Dispute {
   return {
     id: r.id,
     object: 'dispute',
@@ -298,7 +299,7 @@ function dispute(r: Dispute): Wire {
 }
 
 // deno-lint-ignore no-explicit-any
-const projections: Record<Kind | 'item', (record: any) => Wire> = {
+const projections: Record<Kind | 'item', (record: any) => object> = {
   customer,
   product,
   price,
@@ -330,7 +331,7 @@ const expandable: Record<string, Kind> = {
  * projected from their views, which carry the derived `valid` and `active`.
  */
 export function projectRecord(record: ResourceRecord | LineItem): Wire {
-  return projections[record.object](record);
+  return projections[record.object](record) as Wire;
 }
 
 export async function project(

@@ -25,6 +25,7 @@ import {
 } from '../operations.ts';
 import { readConfig, selectVersion } from '../versions/select.ts';
 import type { StripeVersionModule } from '../versions/types.ts';
+import type * as Dahlia from '../versions/dahlia/wire.ts';
 import {
   type Commands as WebhookCommands,
   commands as webhookCommands,
@@ -34,20 +35,17 @@ type Operation<I, O> = ReturnType<
   typeof defineCommand<z.ZodType<I, I>, z.ZodType<O, O>>
 >;
 
-/** A Stripe object as the version a command selected shows it. */
-export type WireObject<Name extends string> =
-  & { id: string; object: Name }
-  // deno-lint-ignore no-explicit-any
-  & Record<string, any>;
-
-/** Wire objects are validated by their identity; the module owns their shape. */
-function wire<Name extends string>(
-  object: Name,
-): z.ZodType<WireObject<Name>, WireObject<Name>> {
+/**
+ * Wire objects are validated by their identity; the module owns their shape.
+ * Results are typed as the baseline dahlia objects, the only version shipped.
+ */
+function wire<T extends { id: string; object: string }>(
+  object: T['object'],
+): z.ZodType<T, T> {
   return z.looseObject({
     id: z.string(),
     object: z.literal(object),
-  }) as unknown as z.ZodType<WireObject<Name>, WireObject<Name>>;
+  }) as unknown as z.ZodType<T, T>;
 }
 
 const id = z.string().min(1);
@@ -66,30 +64,30 @@ interface RefundInput {
 }
 
 export type Commands = WebhookCommands & {
-  'customers.create': Operation<CustomerCommandInput, WireObject<'customer'>>;
-  'customers.get': Operation<Versioned<{ id: string }>, WireObject<'customer'>>;
+  'customers.create': Operation<CustomerCommandInput, Dahlia.Customer>;
+  'customers.get': Operation<Versioned<{ id: string }>, Dahlia.Customer>;
   'keys.create': Operation<Record<string, never>, { apiKey: string }>;
   'checkout.sessions.get': Operation<
     Versioned<{ id: string }>,
-    WireObject<'checkout.session'>
+    Dahlia.CheckoutSession
   >;
   'checkout.sessions.complete': Operation<
     Versioned<CompleteInput>,
-    WireObject<'checkout.session'>
+    Dahlia.CheckoutSession
   >;
   'checkout.sessions.expire': Operation<
     Versioned<{ id: string }>,
-    WireObject<'checkout.session'>
+    Dahlia.CheckoutSession
   >;
-  'charges.get': Operation<Versioned<{ id: string }>, WireObject<'charge'>>;
-  'refunds.create': Operation<Versioned<RefundInput>, WireObject<'refund'>>;
+  'charges.get': Operation<Versioned<{ id: string }>, Dahlia.Charge>;
+  'refunds.create': Operation<Versioned<RefundInput>, Dahlia.Refund>;
   'disputes.create': Operation<
     Versioned<{ charge: string; reason?: DisputeReason | undefined }>,
-    WireObject<'dispute'>
+    Dahlia.Dispute
   >;
   'disputes.close': Operation<
     Versioned<{ id: string; status: ClosedStatus }>,
-    WireObject<'dispute'>
+    Dahlia.Dispute
   >;
 };
 
@@ -178,7 +176,7 @@ export function commands(
     'customers.create': defineCommand({
       description: 'Create a customer and record customer.created',
       input: customerCommandInput,
-      output: wire('customer'),
+      output: wire<Dahlia.Customer>('customer'),
       cli: {
         path: ['customers', 'create'],
         flags: {
@@ -201,7 +199,7 @@ export function commands(
     'customers.get': defineCommand({
       description: 'Read a customer',
       input: z.strictObject({ id, apiVersion }),
-      output: wire('customer'),
+      output: wire<Dahlia.Customer>('customer'),
       cli: {
         path: ['customers', 'get'],
         flags: { id: 'id', ...versionFlag },
@@ -223,7 +221,7 @@ export function commands(
     'checkout.sessions.get': defineCommand({
       description: 'Read a Checkout Session',
       input: z.strictObject({ id, apiVersion }),
-      output: wire('checkout.session'),
+      output: wire<Dahlia.CheckoutSession>('checkout.session'),
       cli: {
         path: ['checkout', 'sessions', 'get'],
         positional: 'id',
@@ -246,7 +244,7 @@ export function commands(
         promotionCode: z.string().min(1).max(500).optional(),
         apiVersion,
       }),
-      output: wire('checkout.session'),
+      output: wire<Dahlia.CheckoutSession>('checkout.session'),
       cli: {
         path: ['checkout', 'sessions', 'complete'],
         positional: 'id',
@@ -267,7 +265,7 @@ export function commands(
     'checkout.sessions.expire': defineCommand({
       description: 'Expire an open Checkout Session',
       input: z.strictObject({ id, apiVersion }),
-      output: wire('checkout.session'),
+      output: wire<Dahlia.CheckoutSession>('checkout.session'),
       cli: {
         path: ['checkout', 'sessions', 'expire'],
         positional: 'id',
@@ -283,7 +281,7 @@ export function commands(
     'charges.get': defineCommand({
       description: 'Read a charge',
       input: z.strictObject({ id, apiVersion }),
-      output: wire('charge'),
+      output: wire<Dahlia.Charge>('charge'),
       cli: {
         path: ['charges', 'get'],
         positional: 'id',
@@ -306,7 +304,7 @@ export function commands(
           .optional(),
         apiVersion,
       }),
-      output: wire('refund'),
+      output: wire<Dahlia.Refund>('refund'),
       cli: {
         path: ['refunds', 'create'],
         flags: {
@@ -331,7 +329,7 @@ export function commands(
         reason: z.enum(disputeReasons).optional(),
         apiVersion,
       }),
-      output: wire('dispute'),
+      output: wire<Dahlia.Dispute>('dispute'),
       cli: {
         path: ['disputes', 'create'],
         flags: { charge: 'charge', reason: 'reason', ...versionFlag },
@@ -347,7 +345,7 @@ export function commands(
       description:
         'Close a dispute as won, lost or warning_closed, recording charge.dispute.closed',
       input: z.strictObject({ id, status: z.enum(closedStatuses), apiVersion }),
-      output: wire('dispute'),
+      output: wire<Dahlia.Dispute>('dispute'),
       cli: {
         path: ['disputes', 'close'],
         positional: 'id',
