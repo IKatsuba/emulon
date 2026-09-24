@@ -2,6 +2,7 @@ import { Emulon, type EventRecord } from 'emulon';
 import { serveEnvironment } from '../src/control/server.ts';
 import { runProjectCLI } from '../src/cli/project.ts';
 import { listen } from '../src/runtime/http.ts';
+import { viewEvent } from '../src/deliveries/presentation.ts';
 import { plain, presented, sign } from './fixtures/presentation.ts';
 
 function equal(actual: unknown, expected: unknown) {
@@ -310,4 +311,28 @@ Deno.test('presentation factories must return hook functions', async () => {
   }
 
   throw new Error('Expected startup failure');
+});
+
+Deno.test('event views accept binary payloads without mutating stored events', () => {
+  const payload = { body: new Uint8Array([1, 2, 3]) };
+  const event: EventRecord = {
+    id: 'evt_1',
+    instanceId: 'binary',
+    type: 'binary',
+    occurredAt: '2026-01-01T00:00:00.000Z',
+    origin: 'service',
+    payload,
+  };
+  const view = viewEvent(event, {
+    eventView: (seen) => {
+      const body = (seen.payload as { body: Uint8Array }).body;
+
+      body[0] = 9;
+
+      return Array.from(body);
+    },
+  });
+
+  equal(view.payload, [9, 2, 3]);
+  equal(Array.from(payload.body), [1, 2, 3]);
 });

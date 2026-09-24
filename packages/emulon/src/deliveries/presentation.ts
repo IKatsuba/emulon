@@ -14,7 +14,11 @@ export const snapshotSchema: z.ZodType<{ id: string; bytes: number[] }> = z
 function frozen<T>(value: T): T {
   const copy = cloneState(value);
   const freeze = (item: unknown) => {
-    if (typeof item === 'object' && item !== null && !Object.isFrozen(item)) {
+    // Non-empty typed arrays cannot be frozen; the clone already isolates them.
+    if (
+      typeof item === 'object' && item !== null && !Object.isFrozen(item) &&
+      !ArrayBuffer.isView(item) && !(item instanceof ArrayBuffer)
+    ) {
       Object.freeze(item);
       Object.values(item).forEach(freeze);
     }
