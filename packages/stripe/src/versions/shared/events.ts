@@ -4,7 +4,6 @@ import type { EventFact, ResourceRecord } from '../../model/core.ts';
 import { disputeReasons } from '../../model/payments.ts';
 import { eventObjects, eventTypes } from '../../webhooks/mod.ts';
 import type { StripeEvent } from '../types.ts';
-import { projectEventObject } from './project.ts';
 
 const nullable = z.string().nullable();
 const metadata = z.record(z.string(), z.string());
@@ -112,8 +111,10 @@ function envelope(version: string) {
   });
 }
 
+/** An event envelope around the object as `project` shows it in `version`. */
 export function projectEvent(
   version: string,
+  project: (record: ResourceRecord) => Record<string, unknown>,
   type: string,
   fact: EventFact,
 ): StripeEvent {
@@ -123,7 +124,7 @@ export function projectEvent(
     api_version: version,
     created: fact.created,
     data: {
-      object: projectEventObject(fact.object),
+      object: project(fact.object),
       ...(fact.previous
         ? { previous_attributes: structuredClone(fact.previous) }
         : {}),

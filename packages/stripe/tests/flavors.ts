@@ -22,6 +22,16 @@ export interface Flavor {
   options: Options;
   /** Whether `managed_payments` exists in this version. */
   managedPayments: boolean;
+  /**
+   * Checkout's `ui_mode`: the emulated hosted value, the version's other
+   * values, which fail explicitly, and a value only another version knows.
+   */
+  uiModes: { hosted: string; unsupported: string[]; foreign: string };
+  /**
+   * Whether objects name `customer_account` and a buyer's `business_name` and
+   * `individual_name`.
+   */
+  accountFields: boolean;
   /** The parameter shared rules name for a promotion code's coupon. */
   couponParam: string;
   createPromotionCode(
@@ -47,6 +57,12 @@ export const dahliaFlavor: Flavor = {
   // The baseline: without options only dahlia is served.
   options: {},
   managedPayments: true,
+  uiModes: {
+    hosted: 'hosted_page',
+    unsupported: ['embedded_page', 'elements', 'form'],
+    foreign: 'hosted',
+  },
+  accountFields: true,
   couponParam: 'promotion[coupon]',
   createPromotionCode: (sdk, coupon, params = {}) =>
     sdk.promotionCodes.create({
@@ -66,6 +82,12 @@ export const basilFlavor: Flavor = {
     defaultApiVersion: basilVersion,
   },
   managedPayments: false,
+  uiModes: {
+    hosted: 'hosted',
+    unsupported: ['embedded', 'custom'],
+    foreign: 'hosted_page',
+  },
+  accountFields: false,
   couponParam: 'coupon',
   createPromotionCode: (sdk, coupon, params = {}) =>
     sdk.promotionCodes.create(

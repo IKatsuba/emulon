@@ -15,7 +15,7 @@ const id = '2025-03-31.basil';
  * always an object there, so it does not expand; elsewhere a coupon is still a
  * reference.
  */
-const { project } = projector(
+const { project, projectRecord } = projector(
   (r) => ({
     ...promotionCodeFields(r),
     coupon: r.coupon_view === null
@@ -36,12 +36,14 @@ const codeFormat = {
   message: 'Promotion codes may contain only letters and digits.',
 };
 
+const uiModes = { values: ['hosted', 'embedded', 'custom'], hosted: 'hosted' };
+
 const parse = parser({
   'promotion_codes.create': (fields) =>
     readPromotionCode(fields, fields.required('coupon'), codeFormat),
   // Basil predates Stripe-managed payments.
   'checkout.sessions.create': (fields) =>
-    readSession(fields, { managedPayments: false }),
+    readSession(fields, { managedPayments: false, uiModes }),
 });
 
 /** Stripe API version 2025-03-31.basil, verified with stripe@18.0.0. */
@@ -49,7 +51,7 @@ export const basil: StripeVersionModule = {
   id,
   parse,
   project,
-  projectEvent: (type, fact) => projectEvent(id, type, fact),
+  projectEvent: (type, fact) => projectEvent(id, projectRecord, type, fact),
   parseEvent: (type, input) => parseEvent(id, type, input),
   // Shared rules name parameters as basil does.
   error: (_operation, error) => error,

@@ -72,13 +72,20 @@ export function readCustomer(fields: Fields): CustomerInput {
   return input;
 }
 
+/** How one version spells Checkout's `ui_mode`. */
+export interface UiModes {
+  /** Every value the version accepts; only `hosted` is emulated. */
+  values: readonly string[];
+  hosted: string;
+}
+
 /**
  * `managed_payments` exists only in versions that know Stripe-managed
  * payments; elsewhere it is an unknown parameter.
  */
 export function readSession(
   fields: Fields,
-  { managedPayments }: { managedPayments: boolean },
+  { managedPayments, uiModes }: { managedPayments: boolean; uiModes: UiModes },
 ): SessionInput {
   const mode = fields.oneOf('mode', ['payment', 'setup', 'subscription']);
   const lines = fields.list('line_items');
@@ -96,7 +103,7 @@ export function readSession(
   ]);
   const locale = fields.string('locale');
   const paymentMethodTypes = fields.strings('payment_method_types');
-  const uiMode = fields.oneOf('ui_mode', ['hosted', 'embedded', 'custom']);
+  const uiMode = fields.oneOf('ui_mode', uiModes.values);
   const managed = managedPayments
     ? fields.object('managed_payments')
     : undefined;
@@ -122,9 +129,9 @@ export function readSession(
     );
   }
 
-  if (uiMode !== undefined && uiMode !== 'hosted') {
+  if (uiMode !== undefined && uiMode !== uiModes.hosted) {
     throw invalidRequest(
-      'The local Stripe emulator supports only hosted Checkout.',
+      `The local Stripe emulator supports only hosted Checkout (ui_mode ${uiModes.hosted}).`,
       'ui_mode',
     );
   }

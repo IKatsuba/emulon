@@ -62,8 +62,14 @@ the implemented slice that is the promotion code, where basil takes a top-level
 `coupon` and shows the whole coupon object there (it does not expand), while
 dahlia takes and shows `promotion: { type: 'coupon', coupon }` and expands
 `promotion.coupon`; each version rejects the other's parameters. Checkout's
-`managed_payments` exists only in dahlia. Every other object in the slice has
-the same shape in both.
+`managed_payments` exists only in dahlia, and hosted Checkout is `ui_mode`
+`hosted` in basil and `hosted_page` (the default) in dahlia; other `ui_mode`
+values fail explicitly and each version rejects the other's spelling. Dahlia
+also shows `customer_account` on customers, Checkout Sessions, payment intents
+and promotion codes, and `business_name` and `individual_name` in a session's
+`customer_details`; they are always `null`, since the emulator has no Accounts
+and collects neither name. Every other object in the slice has the same shape in
+both.
 
 An event shows the version of the request that caused it (commands and the
 hosted page use the account default), while each webhook endpoint receives

@@ -54,6 +54,40 @@ const envelopeKeys = [
   'type',
 ];
 
+/**
+ * A dahlia event's data as basil shows it: without the null Account and buyer
+ * name fields dahlia adds, which it must carry, and with basil's `ui_mode`.
+ */
+function asBasil(event: Stripe.Event): unknown {
+  const data = structuredClone(event.data) as unknown as {
+    object: Record<string, unknown>;
+  };
+  const object = data.object;
+  const drop = (from: Record<string, unknown>, field: string) => {
+    assert(from[field] === null, `${field} in ${event.type}`);
+    delete from[field];
+  };
+
+  if (['customer', 'checkout.session'].includes(object.object as string)) {
+    drop(object, 'customer_account');
+  }
+
+  if (object.object === 'checkout.session') {
+    assert(object.ui_mode === 'hosted_page', event.type);
+
+    object.ui_mode = 'hosted';
+
+    const details = object.customer_details as Record<string, unknown> | null;
+
+    if (details) {
+      drop(details, 'business_name');
+      drop(details, 'individual_name');
+    }
+  }
+
+  return data;
+}
+
 /** Raw HTTP in an explicit version, to see exactly what each one accepts. */
 function http(base: string, apiKey: string) {
   return async (
@@ -307,10 +341,11 @@ Deno.test('Stripe serves apps on stripe@18.0.0 and stripe@22.1.1 at once, each e
             JSON.stringify(envelopeKeys),
         type,
       );
-      // The six declared objects have one shape in both versions.
+      // The six declared objects differ only in what dahlia adds and in how
+      // it spells hosted Checkout.
       assert(
-        JSON.stringify({ ...event, api_version: '' }) ===
-          JSON.stringify({ ...twin, api_version: '' }),
+        JSON.stringify({ ...event, api_version: '', data: asBasil(event) }) ===
+          JSON.stringify({ ...twin, api_version: '', data: twin.data }),
         type,
       );
     }
@@ -390,11 +425,17 @@ Deno.test('Stripe basil embeds the coupon where dahlia nests promotion, and each
 
   // Everything else is the same object.
   const { coupon: _coupon, ...basilRest } = basil.value;
-  const { promotion: _promotion, ...dahliaRest } = await request(
+  const {
+    promotion: _promotion,
+    customer_account: account,
+    ...dahliaRest
+  } = await request(
     dahliaVersion,
     `/v1/promotion_codes/${basil.value.id}`,
   ).then((r) => r.value);
 
+  // Dahlia also names the customer's Account, which the emulator lacks.
+  assert(account === null && !('customer_account' in basil.value));
   assert(JSON.stringify(basilRest) === JSON.stringify(dahliaRest));
 
   // Input: each version names the coupon its own way only.

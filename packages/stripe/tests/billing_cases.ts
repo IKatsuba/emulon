@@ -472,6 +472,37 @@ export function billingCases(flavor: Flavor, register: Register) {
       );
       assert(session.discounts?.[0]?.promotion_code === code.id);
 
+      // Each version spells hosted Checkout its own way and defaults to it.
+      const { hosted, unsupported, foreign } = flavor.uiModes;
+
+      assert(session.ui_mode === hosted);
+      assert(
+        (await sdk.checkout.sessions.create({
+          ...base,
+          ui_mode: hosted,
+        } as Stripe.Checkout.SessionCreateParams)).ui_mode === hosted,
+      );
+
+      for (const mode of unsupported) {
+        await rejects(
+          () =>
+            sdk.checkout.sessions.create({ ...base, ui_mode: mode } as never),
+          (e) =>
+            invalid('ui_mode')(e) && e.message.includes('only hosted Checkout'),
+        );
+      }
+
+      await rejects(
+        () =>
+          sdk.checkout.sessions.create({ ...base, ui_mode: foreign } as never),
+        (e) =>
+          invalid('ui_mode')(e) &&
+          e.message ===
+            `Invalid ui_mode: must be one of ${
+              [hosted, ...unsupported].join(', ')
+            }.`,
+      );
+
       const items = await sdk.checkout.sessions.listLineItems(session.id);
 
       assert(items.data.length === 1 && items.data[0]!.amount_total === 9675);
@@ -531,6 +562,26 @@ export function billingCases(flavor: Flavor, register: Register) {
       assert(typeof complete.payment_intent === 'string');
 
       const intent = await sdk.paymentIntents.retrieve(complete.payment_intent);
+
+      // Dahlia names the customer's Account and the buyer's business and
+      // individual names; the emulator has no source for them.
+      const accountFields = [
+        [session, 'customer_account'],
+        [complete, 'customer_account'],
+        [complete.customer_details, 'business_name'],
+        [complete.customer_details, 'individual_name'],
+        [intent, 'customer_account'],
+        [code, 'customer_account'],
+      ] as const;
+
+      for (const [object, field] of accountFields) {
+        assert(
+          flavor.accountFields
+            ? (object as unknown as Record<string, unknown>)[field] === null
+            : !Object.hasOwn(object!, field),
+          `${field} in ${version}`,
+        );
+      }
 
       assert(intent.status === 'succeeded' && intent.amount === 9675);
       assert(typeof intent.latest_charge === 'string');

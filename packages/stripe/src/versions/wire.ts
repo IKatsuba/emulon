@@ -9,7 +9,8 @@ import type {
 
 /**
  * The objects control commands return, as the SDK types them. Every shipped
- * version shows these the same way.
+ * version shows these the same way, except that dahlia adds the optional
+ * fields below and spells hosted Checkout `hosted_page`.
  */
 
 export interface Customer {
@@ -19,6 +20,7 @@ export interface Customer {
   balance: number;
   created: number;
   currency: string | null;
+  customer_account?: null;
   default_source: null;
   delinquent: boolean;
   description: string | null;
@@ -53,10 +55,13 @@ export interface CheckoutSession {
   created: number;
   currency: string;
   customer: string | null;
+  customer_account?: null;
   customer_creation: 'always' | 'if_required';
   customer_details: {
     address: null;
+    business_name?: null;
     email: string | null;
+    individual_name?: null;
     name: string | null;
     phone: null;
     tax_exempt: 'none';
@@ -79,7 +84,7 @@ export interface CheckoutSession {
     amount_shipping: 0;
     amount_tax: 0;
   };
-  ui_mode: 'hosted';
+  ui_mode: 'hosted' | 'hosted_page';
   url: string | null;
 }
 
@@ -95,6 +100,7 @@ export interface PaymentIntent {
   created: number;
   currency: string;
   customer: string | null;
+  customer_account?: null;
   description: string | null;
   latest_charge: string;
   livemode: false;

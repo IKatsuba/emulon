@@ -175,6 +175,7 @@ function session(r: CheckoutSession): Shared.CheckoutSession {
       amount_shipping: 0,
       amount_tax: 0,
     },
+    // Basil's spelling; dahlia's module renames it.
     ui_mode: 'hosted',
     url: r.url,
   };
@@ -301,7 +302,7 @@ function dispute(r: Dispute): Shared.Dispute {
 // deno-lint-ignore no-explicit-any
 type Projection = (record: any) => object;
 
-/** Objects whose shape is the same in every shipped version. */
+/** Objects every shipped version shows alike, before its extensions. */
 const projections: Record<
   Exclude<Kind, 'promotion_code'> | 'item',
   Projection
@@ -331,14 +332,13 @@ export const references: Readonly<Record<string, Kind>> = {
   default_price: 'price',
 };
 
-/** An object every event type carries, the same in every shipped version. */
-export function projectEventObject(record: ResourceRecord): Wire {
-  if (record.object === 'promotion_code') {
-    throw new Error('Promotion codes are projected by their version.');
-  }
-
-  return projections[record.object](record) as Wire;
-}
+/**
+ * What one version adds to or renames in a shared object, applied to its
+ * shared projection.
+ */
+export type Extensions = Partial<
+  Record<Exclude<Kind, 'promotion_code'> | 'item', (wire: Wire) => Wire>
+>;
 
 export interface Projector {
   /** A stored record, or a coupon or promotion code view, as an object. */
@@ -351,18 +351,25 @@ export interface Projector {
 }
 
 /**
- * The projection of one version: shared objects plus its own promotion code,
- * and the properties that expand. `expandable` sees the owning object's type,
- * since a property can be a reference in one object and embedded in another.
+ * The projection of one version: shared objects with its extensions, its own
+ * promotion code, and the properties that expand. `expandable` sees the owning
+ * object's type, since a property can be a reference in one object and
+ * embedded in another.
  */
 export function projector(
   promotionCode: (record: PromotionCodeView) => Wire,
   expandable: (owner: string | undefined, property: string) => Kind | undefined,
+  extensions: Extensions = {},
 ): Projector {
   function projectRecord(record: ResourceRecord | LineItem): Wire {
-    return record.object === 'promotion_code'
-      ? promotionCode(record as PromotionCodeView)
-      : projections[record.object](record) as Wire;
+    if (record.object === 'promotion_code') {
+      return promotionCode(record as PromotionCodeView);
+    }
+
+    const wire = projections[record.object](record) as Wire;
+    const extend = extensions[record.object];
+
+    return extend ? extend(wire) : wire;
   }
 
   return {

@@ -66,6 +66,13 @@ async function officialClientContract(flavor: Flavor) {
     !read.deleted && read.name === 'Ada' && !read.livemode &&
       read.description === null,
   );
+  // Dahlia names the Account representing a customer, which the emulator
+  // does not have.
+  assert(
+    flavor.accountFields
+      ? read.customer_account === null
+      : !Object.hasOwn(read, 'customer_account'),
+  );
   assert(
     (await env.services.stripe.customers.get({ id: first.id })).id ===
       first.id,

@@ -1,5 +1,3 @@
-// Stripe API fields are snake_case on the wire.
-// deno-lint-ignore-file camelcase
 import stripe from '@emulon/stripe';
 import {
   destinationFixture,
@@ -25,7 +23,6 @@ import type { EventFact, Store } from '../src/model/core.ts';
 import { perform } from '../src/operations.ts';
 import { basil } from '../src/versions/basil/mod.ts';
 import { dahlia } from '../src/versions/dahlia/mod.ts';
-import { projectEventObject as projectRecord } from '../src/versions/shared/project.ts';
 import { caseRegistry } from '../../emulon/tests/helpers/compatibility.ts';
 import { serveEnvironment } from '../../emulon/src/control/server.ts';
 import { runProjectCLI } from '../../emulon/src/cli/project.ts';
@@ -86,19 +83,15 @@ export function webhookCases(flavor: Flavor, register: Register) {
   const { version } = flavor;
   const module = modules.get(version)!;
   const secret = 'whsec_literal_utf8_£';
-  const event: EventInput = {
+  // The customer as the flavor's version shows it in an event.
+  const event = module.projectEvent('customer.created', {
     id: 'evt_synthetic',
-    object: 'event',
-    api_version: version,
+    apiVersion: version,
     created: 1700000000,
-    type: 'customer.created',
-    livemode: false,
-    pending_webhooks: 1,
-    request: { id: null, idempotency_key: null },
-    data: {
-      object: projectRecord(makeCustomer({}, 'cus_synthetic', 1700000000000)),
-    },
-  };
+    object: makeCustomer({}, 'cus_synthetic', 1700000000000),
+    pendingWebhooks: 1,
+    request: { id: null, idempotencyKey: null },
+  }) as unknown as EventInput;
   // What the control commands record for it; core delivery sends facts.
   const fact: EventFact = module.parseEvent(event.type, event);
 

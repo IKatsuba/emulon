@@ -17,6 +17,8 @@ interface Flavor {
   promotionOutput: string;
   promotionExpand: string[];
   managedPayments: string[];
+  /** Hosted Checkout, the only `ui_mode` emulated, as the version spells it. */
+  uiMode: string;
   suites: { path: string; cases: string[] }[];
 }
 
@@ -28,6 +30,7 @@ const flavors: Flavor[] = [{
   promotionOutput: 'PromotionCode with promotion { type, coupon }',
   promotionExpand: ['expand[] (promotion.coupon)'],
   managedPayments: ['managed_payments[enabled]'],
+  uiMode: 'ui_mode=hosted_page',
   suites: [{
     path: 'packages/stripe/tests/webhook_cases.ts',
     cases: ['stripe.webhooks.1', 'stripe.webhooks.2'],
@@ -52,6 +55,7 @@ const flavors: Flavor[] = [{
   promotionOutput: 'PromotionCode with the whole Coupon as top-level coupon',
   promotionExpand: ['expand[] (coupon is always embedded)'],
   managedPayments: [],
+  uiMode: 'ui_mode=hosted',
   suites: [{
     path: 'packages/stripe/tests/basil_cases.ts',
     cases: [
@@ -321,7 +325,7 @@ function operations(flavor: Flavor): Operation[] {
         'expires_at',
         'locale',
         'payment_method_types[]',
-        'ui_mode=hosted',
+        flavor.uiMode,
         ...flavor.managedPayments,
         'metadata',
       ],
@@ -550,12 +554,12 @@ export const compatibility: CompatibilityManifest = defineCompatibility({
     {
       id: 'stripe.versions',
       description:
-        'Ships 2026-04-22.dahlia and 2025-03-31.basil; apiVersions selects which an instance serves. Only the differences inside the implemented slice are modeled: basil embeds the whole coupon in a promotion code and has no managed_payments. A promotion code whose coupon was deleted shows basil a deleted coupon stub.',
+        'Ships 2026-04-22.dahlia and 2025-03-31.basil; apiVersions selects which an instance serves. Only the differences inside the implemented slice are modeled: basil embeds the whole coupon in a promotion code, has no managed_payments and spells hosted Checkout ui_mode=hosted where dahlia uses hosted_page. In dahlia, customer_account and customer_details business_name and individual_name are always null: the emulator has no Accounts and collects neither name. A promotion code whose coupon was deleted shows basil a deleted coupon stub.',
     },
     {
       id: 'stripe.resources',
       description:
-        'Implemented: customers (create, retrieve), products, one-time prices, coupons, promotion codes, payment-mode hosted Checkout, payment intents and charges as Checkout produces them, refunds and disputes. Not implemented: subscriptions, invoices, recurring prices, price_data, embedded Checkout, Payment Element, Connect, test clocks, search and customer lists.',
+        'Implemented: customers (create, retrieve), products, one-time prices, coupons, promotion codes, payment-mode hosted Checkout (other ui_mode values fail explicitly), payment intents and charges as Checkout produces them, refunds and disputes. Not implemented: subscriptions, invoices, recurring prices, price_data, embedded Checkout, Payment Element, Connect, test clocks, search and customer lists.',
     },
     {
       id: 'stripe.checkout',
