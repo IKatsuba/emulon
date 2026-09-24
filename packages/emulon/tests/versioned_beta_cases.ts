@@ -1,3 +1,3 @@
-import { versionedCases } from './fixtures/versioned.ts';
+import { versionedCases } from './helpers/versioned.ts';
 
-export const cases = versionedCases('beta', { item: { name: 'a' } });
+export const cases = versionedCases('beta');
