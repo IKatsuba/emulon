@@ -1,7 +1,10 @@
 import polar from '@emulon/polar';
 import { readRegistration } from '../../emulon/src/plugins/define.ts';
 import { memoryAdapter, type Store } from '../../emulon/src/state/store.ts';
-import { verifyCoverage } from '../../emulon/tests/helpers/compatibility.ts';
+import {
+  verifyCoverage,
+  webhookCases as declaredWebhookCases,
+} from '../../emulon/tests/helpers/compatibility.ts';
 import { compatibility } from '../src/compatibility.ts';
 import { issuedKey, matchesKey } from '../src/auth/keys.ts';
 import {
@@ -287,7 +290,7 @@ Deno.test('Polar declares the emulated capabilities exactly once', () => {
     'webhooks',
     'reset',
   ]);
-  equal([...compatibility.webhooks.cases], [
+  equal(declaredWebhookCases(compatibility), [
     'polar.webhooks.1',
     'polar.webhooks.2',
     'polar.webhooks.3',

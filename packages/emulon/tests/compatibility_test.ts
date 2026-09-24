@@ -1,4 +1,9 @@
-import { defineCompatibility, definePlugin, Emulon } from 'emulon';
+import {
+  type CompatibilityManifest,
+  defineCompatibility,
+  definePlugin,
+  Emulon,
+} from 'emulon';
 import { compatibility as githubManifest } from '../../github/src/compatibility.ts';
 import { compatibility as resendManifest } from '../../resend/src/compatibility.ts';
 import github from '../../github/src/mod.ts';
@@ -7,6 +12,11 @@ import { readRegistration } from '../src/plugins/define.ts';
 import { compatibilityCommand } from '../src/plugins/compatibility.ts';
 import { runProjectCLI } from '../src/cli/project.ts';
 import { serveEnvironment } from '../src/control/server.ts';
+
+const resendSuites = (resendManifest as Extract<
+  CompatibilityManifest,
+  { schemaVersion: 1 }
+>).verification.suites;
 
 function equal(actual: unknown, expected: unknown) {
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
@@ -53,15 +63,15 @@ Deno.test('compatibility schema rejects incomplete, duplicate and unreferenced c
         verification: {
           ...resendManifest.verification,
           suites: [
-            ...resendManifest.verification.suites,
-            resendManifest.verification.suites[0],
+            ...resendSuites,
+            resendSuites[0],
           ],
         },
       },
       {
         verification: {
           ...resendManifest.verification,
-          suites: [...resendManifest.verification.suites, {
+          suites: [...resendSuites, {
             path: 'orphan.ts',
             cases: ['orphan'],
           }],

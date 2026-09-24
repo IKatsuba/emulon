@@ -1,7 +1,10 @@
 // npm reads its configuration from npm_config_* environment variables.
 // deno-lint-ignore-file camelcase
 import { calcomProof } from './calcom-proof.ts';
-import { compatibilityProof } from './compatibility-proof.ts';
+import {
+  compatibilityProof,
+  installVersionedPackage,
+} from './compatibility-proof.ts';
 import ts from 'typescript';
 import { managerProof } from './manager-proof.ts';
 import { polarAcceptance, polarProof } from './polar-proof.ts';
@@ -492,6 +495,7 @@ console.log("STATE_IN_USE before instance preparation");
 
     const prefix = runtime === 'Deno' ? 'npm:' : '';
 
+    await installVersionedPackage(cwd);
     await Deno.writeTextFile(
       `${cwd}/compatibility.mjs`,
       compatibilityProof(prefix),

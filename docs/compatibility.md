@@ -32,6 +32,30 @@ capabilities must match. The host adds `compatibility.get` with its inferred SDK
 result type; an authored command with that name or CLI path is rejected.
 Third-party plugins may omit the declaration.
 
+## Schema versions
+
+Every current official declaration uses `schemaVersion: 1`: operation and event
+IDs are unique, one `webhooks` object describes delivery, and one `verification`
+record names the client pin and suites. `schemaVersion: 2` serves plugins that
+ship several provider API versions side by side
+([ADR 0036](decisions/0036-stripe-api-version-modules.md)):
+
+- operation and event claims are unique by `(id, version)`, and `webhooks` is a
+  list with at most one claim per version;
+- `verification.byVersion[]` holds one record per declared version, with the
+  mode, exact client pin, suites and case IDs, sources, retrieval date and
+  `liveProviderCompared: false`;
+- every version referenced by a claim is declared, every declared version claims
+  the complete operation, event and webhook slice, case IDs are distinct across
+  versions, and a claim may reference only cases in its own version's suites.
+
+The TypeScript type `CompatibilityManifest` is the union of both versions;
+narrow it with `schemaVersion`. Rejections name the failing location and rule,
+such as `versions[1]: Version does not cover the complete operations slice.`,
+without echoing declared values. The command, npm metadata and connected-client
+comparison are the same for both versions. A version-2 manifest lists shipped
+versions; the instance options decide which ones are enabled.
+
 ## Coverage and verification
 
 GitHub and Resend use `tests/compatibility_test.ts` to import executable case
@@ -41,8 +65,9 @@ parity registries. Cases retain the original assertions for provider requests,
 response projections, errors, authorization, events and signatures. The runner
 checks equality of declared and registered case IDs, suite paths, and the
 operation/event/webhook coverage of each case, then executes every registered
-case. A mutation test adds an operation using an existing case ID and proves
-that coverage validation rejects it.
+case. In a version-2 manifest, a case covers claims only of the version whose
+suite registers it. A mutation test adds an operation using an existing case ID
+and proves that coverage validation rejects it.
 
 `deno task check` runs these suites, the schema/command tests, npm builds and
 isolated offline Node/Deno installations. Installed consumers compare source,

@@ -2,7 +2,10 @@ import polar from '@emulon/polar';
 import { Emulon } from 'emulon';
 import { serveEnvironment } from '../../emulon/src/control/server.ts';
 import { runProjectCLI } from '../../emulon/src/cli/project.ts';
-import { caseRegistry } from '../../emulon/tests/helpers/compatibility.ts';
+import {
+  caseRegistry,
+  manifestSuites,
+} from '../../emulon/tests/helpers/compatibility.ts';
 import { compatibility } from '../src/compatibility.ts';
 import type { Customer } from '../src/model/customers.ts';
 import { client, organizationId } from './customers_cases.ts';
@@ -126,7 +129,7 @@ async function parityContract() {
 
     // Every declared case is a case this suite executes, and every executed
     // suite path exists, so the manifest advertises nothing unverified.
-    for (const suite of compatibility.verification.suites) {
+    for (const suite of manifestSuites(compatibility)) {
       assert(
         (await Deno.stat(new URL(`../../../${suite.path}`, import.meta.url)))
           .isFile,
