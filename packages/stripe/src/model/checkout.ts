@@ -1,13 +1,14 @@
-// Stripe API fields are snake_case on the wire.
+// Stripe's domain terms are snake_case; records keep them as field names.
 // deno-lint-ignore-file camelcase
 import { invalidRequest } from '../errors.ts';
-import type { Fields } from '../http/fields.ts';
 import {
   all,
   emit,
   find,
+  type List,
   load,
   type Metadata,
+  type Page,
   paginate,
   randomId,
   save,
@@ -24,10 +25,10 @@ export interface LineItem {
   object: 'item';
   amount_discount: number;
   amount_subtotal: number;
-  amount_tax: 0;
   amount_total: number;
   currency: string;
   description: string;
+  /** The price as it was when the session was created. */
   price: Price;
   quantity: number;
 }
@@ -36,6 +37,7 @@ export interface CheckoutSession {
   id: string;
   object: 'checkout.session';
   allow_promotion_codes: boolean | null;
+  amount_discount: number;
   amount_subtotal: number;
   amount_total: number;
   cancel_url: string | null;
@@ -44,33 +46,41 @@ export interface CheckoutSession {
   currency: string;
   customer: string | null;
   customer_creation: 'always' | 'if_required';
-  customer_details: {
-    address: null;
-    email: string | null;
-    name: string | null;
-    phone: null;
-    tax_exempt: 'none';
-    tax_ids: [];
-  } | null;
+  customer_details: { email: string; name: string | null } | null;
   customer_email: string | null;
   discounts: { coupon: string | null; promotion_code: string | null }[];
   expires_at: number;
-  livemode: false;
   locale: string | null;
   metadata: Metadata;
-  mode: 'payment';
   payment_intent: string | null;
   payment_method_types: string[];
   payment_status: 'no_payment_required' | 'paid' | 'unpaid';
   status: 'complete' | 'expired' | 'open';
   success_url: string;
-  total_details: {
-    amount_discount: number;
-    amount_shipping: 0;
-    amount_tax: 0;
-  };
-  ui_mode: 'hosted';
   url: string | null;
+}
+
+export interface SessionInput {
+  lines: { price: string; quantity: number }[];
+  successUrl: string;
+  cancelUrl?: string | undefined;
+  customer?: string | undefined;
+  customerEmail?: string | undefined;
+  clientReferenceId?: string | undefined;
+  allowPromotionCodes?: boolean | undefined;
+  discount?: { promotionCode: string } | { coupon: string } | undefined;
+  expiresAt?: number | undefined;
+  customerCreation?: 'always' | 'if_required' | undefined;
+  locale?: string | undefined;
+  paymentMethodTypes?: string[] | undefined;
+  metadata: Metadata;
+}
+
+export interface SessionFilter {
+  paymentIntent?: string | undefined;
+  customer?: string | undefined;
+  status?: CheckoutSession['status'] | undefined;
+  page: Page;
 }
 
 const lineCollection = 'checkout_line_items';
@@ -138,53 +148,19 @@ export function totals(
   return { subtotal, discount, total: subtotal - discount, perItem };
 }
 
-function checkUrl(value: string, param: string): string {
-  try {
-    const url = new URL(value);
-
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-      throw new Error();
-    }
-  } catch {
-    throw invalidRequest(`Not a valid URL: ${param}.`, param, 'url_invalid');
-  }
-
-  return value;
-}
-
 async function discountFor(
   tx: Transaction,
-  entries: Fields[] | undefined,
+  discount: SessionInput['discount'],
   now: number,
 ) {
-  if (entries === undefined || entries.length === 0) {
+  if (discount === undefined) {
     return undefined;
   }
 
-  if (entries.length > 1) {
-    throw invalidRequest(
-      'You may only apply one discount to a Checkout Session.',
-      'discounts',
-    );
-  }
-
-  const entry = entries[0]!;
-  const promotionCode = entry.string('promotion_code');
-  const couponId = entry.string('coupon');
-
-  entry.done();
-
-  if ((promotionCode === undefined) === (couponId === undefined)) {
-    throw invalidRequest(
-      'You must pass exactly one of coupon or promotion_code.',
-      'discounts[0]',
-    );
-  }
-
-  if (promotionCode !== undefined) {
+  if ('promotionCode' in discount) {
     const { promotion, coupon } = await redeemable(
       tx,
-      { id: promotionCode },
+      { id: discount.promotionCode },
       now,
       'discounts[0][promotion_code]',
     );
@@ -195,7 +171,7 @@ async function discountFor(
   const coupon = await load<Coupon>(
     tx,
     'coupon',
-    couponId!,
+    discount.coupon,
     'discounts[0][coupon]',
   );
 
@@ -211,88 +187,15 @@ async function discountFor(
 
 export async function createSession(
   tx: Transaction,
-  fields: Fields,
+  input: SessionInput,
   now: number,
   hostedUrl: (id: string) => string,
 ): Promise<CheckoutSession> {
-  const mode = fields.oneOf('mode', ['payment', 'setup', 'subscription']);
-  const lines = fields.list('line_items');
-  const customer = fields.string('customer');
-  const customerEmail = fields.string('customer_email', { max: 512 });
-  const clientReference = fields.string('client_reference_id', { max: 200 });
-  const allowPromotion = fields.bool('allow_promotion_codes');
-  const discounts = fields.list('discounts');
-  const successUrl = fields.string('success_url', { max: 5000 });
-  const cancelUrl = fields.string('cancel_url', { max: 5000 });
-  const expiresAt = fields.int('expires_at');
-  const creation = fields.oneOf('customer_creation', ['always', 'if_required']);
-  const locale = fields.string('locale');
-  const methods = fields.strings('payment_method_types');
-  const uiMode = fields.oneOf('ui_mode', ['hosted', 'embedded', 'custom']);
-  const managed = fields.object('managed_payments');
-  const metadata = fields.metadata() ?? {};
-
-  managed?.bool('enabled');
-  managed?.done();
-  fields.done();
-
-  if (mode === undefined) {
-    throw invalidRequest(
-      'Missing required param: mode.',
-      'mode',
-      'parameter_missing',
-    );
-  }
-
-  if (mode !== 'payment') {
-    throw invalidRequest(
-      'The local Stripe emulator supports only payment mode.',
-      'mode',
-    );
-  }
-
-  if (uiMode !== undefined && uiMode !== 'hosted') {
-    throw invalidRequest(
-      'The local Stripe emulator supports only hosted Checkout.',
-      'ui_mode',
-    );
-  }
-
-  if (lines === undefined || lines.length === 0) {
-    throw invalidRequest(
-      'Missing required param: line_items.',
-      'line_items',
-      'parameter_missing',
-    );
-  }
-
-  if (successUrl === undefined) {
-    throw invalidRequest(
-      'Missing required param: success_url.',
-      'success_url',
-      'parameter_missing',
-    );
-  }
-
-  if (customer !== undefined && customerEmail !== undefined) {
-    throw invalidRequest(
-      'You may only specify one of these parameters: customer, customer_email.',
-      'customer_email',
-    );
-  }
-
-  if (allowPromotion !== undefined && discounts !== undefined) {
-    throw invalidRequest(
-      'You may only specify one of these parameters: allow_promotion_codes, discounts.',
-      'allow_promotion_codes',
-    );
-  }
-
   const created = seconds(now);
 
   if (
-    expiresAt !== undefined &&
-    (expiresAt < created + 1800 || expiresAt > created + 86400)
+    input.expiresAt !== undefined &&
+    (input.expiresAt < created + 1800 || input.expiresAt > created + 86400)
   ) {
     throw invalidRequest(
       'expires_at must be between 30 minutes and 24 hours from now.',
@@ -302,39 +205,11 @@ export async function createSession(
 
   const items: { price: Price; quantity: number }[] = [];
 
-  for (const [index, line] of lines.entries()) {
-    const priceId = line.string('price');
-    const quantity = line.int('quantity', { min: 1, max: 999999 });
-
-    if (line.has('price_data')) {
-      throw invalidRequest(
-        'Inline price_data is not supported by the local Stripe emulator; create a price first.',
-        `line_items[${index}][price_data]`,
-      );
-    }
-
-    line.done();
-
-    if (priceId === undefined) {
-      throw invalidRequest(
-        `Missing required param: line_items[${index}][price].`,
-        `line_items[${index}][price]`,
-        'parameter_missing',
-      );
-    }
-
-    if (quantity === undefined) {
-      throw invalidRequest(
-        `Missing required param: line_items[${index}][quantity].`,
-        `line_items[${index}][quantity]`,
-        'parameter_missing',
-      );
-    }
-
+  for (const [index, line] of input.lines.entries()) {
     const price = await load<Price>(
       tx,
       'price',
-      priceId,
+      line.price,
       `line_items[${index}][price]`,
     );
     const product = await load<Product>(tx, 'product', price.product);
@@ -346,7 +221,7 @@ export async function createSession(
       );
     }
 
-    items.push({ price, quantity });
+    items.push({ price, quantity: line.quantity });
   }
 
   const currency = items[0]!.price.currency;
@@ -358,11 +233,11 @@ export async function createSession(
     );
   }
 
-  if (customer !== undefined) {
-    await load<Customer>(tx, 'customer', customer, 'customer');
+  if (input.customer !== undefined) {
+    await load<Customer>(tx, 'customer', input.customer, 'customer');
   }
 
-  const discount = await discountFor(tx, discounts, now);
+  const discount = await discountFor(tx, input.discount, now);
   const amounts = totals(
     items.map((item) => ({
       product: item.price.product,
@@ -375,41 +250,32 @@ export async function createSession(
   const session: CheckoutSession = {
     id,
     object: 'checkout.session',
-    allow_promotion_codes: allowPromotion ?? null,
+    allow_promotion_codes: input.allowPromotionCodes ?? null,
+    amount_discount: amounts.discount,
     amount_subtotal: amounts.subtotal,
     amount_total: amounts.total,
-    cancel_url: cancelUrl === undefined
-      ? null
-      : checkUrl(cancelUrl, 'cancel_url'),
-    client_reference_id: clientReference ?? null,
+    cancel_url: input.cancelUrl ?? null,
+    client_reference_id: input.clientReferenceId ?? null,
     created,
     currency,
-    customer: customer ?? null,
-    customer_creation: creation ?? 'if_required',
+    customer: input.customer ?? null,
+    customer_creation: input.customerCreation ?? 'if_required',
     customer_details: null,
-    customer_email: customerEmail ?? null,
+    customer_email: input.customerEmail ?? null,
     discounts: discount
       ? [{
         coupon: discount.promotion ? null : discount.coupon.id,
         promotion_code: discount.promotion?.id ?? null,
       }]
       : [],
-    expires_at: expiresAt ?? created + 86400,
-    livemode: false,
-    locale: locale ?? null,
-    metadata,
-    mode: 'payment',
+    expires_at: input.expiresAt ?? created + 86400,
+    locale: input.locale ?? null,
+    metadata: input.metadata,
     payment_intent: null,
-    payment_method_types: methods ?? ['card'],
+    payment_method_types: input.paymentMethodTypes ?? ['card'],
     payment_status: 'unpaid',
     status: 'open',
-    success_url: checkUrl(successUrl, 'success_url'),
-    total_details: {
-      amount_discount: amounts.discount,
-      amount_shipping: 0,
-      amount_tax: 0,
-    },
-    ui_mode: 'hosted',
+    success_url: input.successUrl,
     url: hostedUrl(id),
   };
 
@@ -435,7 +301,6 @@ function lineItem(
     object: 'item',
     amount_discount: amounts.perItem[index]!,
     amount_subtotal: subtotal,
-    amount_tax: 0,
     amount_total: subtotal - amounts.perItem[index]!,
     currency: item.price.currency,
     description: item.price.nickname ?? '',
@@ -449,6 +314,7 @@ async function settle(
   tx: Transaction,
   session: CheckoutSession,
   now: number,
+  version: string,
 ): Promise<CheckoutSession> {
   if (session.status !== 'open' || seconds(now) < session.expires_at) {
     return session;
@@ -457,7 +323,7 @@ async function settle(
   const expired: CheckoutSession = { ...session, status: 'expired', url: null };
 
   await save(tx, expired);
-  await emit(tx, 'checkout.session.expired', expired, now);
+  await emit(tx, 'checkout.session.expired', expired, now, version);
 
   return expired;
 }
@@ -466,58 +332,58 @@ export async function getSession(
   tx: Transaction,
   id: string,
   now: number,
+  version: string,
 ): Promise<CheckoutSession> {
   return await settle(
     tx,
     await load<CheckoutSession>(tx, 'checkout.session', id, 'session'),
     now,
+    version,
   );
 }
 
 export async function listSessions(
   tx: Transaction,
-  fields: Fields,
+  filter: SessionFilter,
   now: number,
+  version: string,
 ) {
-  const paymentIntent = fields.string('payment_intent');
-  const customer = fields.string('customer');
-  const status = fields.oneOf('status', ['complete', 'expired', 'open']);
   const sessions: CheckoutSession[] = [];
 
   for (const stored of await all<CheckoutSession>(tx, 'checkout.session')) {
-    const session = await settle(tx, stored, now);
+    const session = await settle(tx, stored, now, version);
 
     if (
-      (paymentIntent === undefined ||
-        session.payment_intent === paymentIntent) &&
-      (customer === undefined || session.customer === customer) &&
-      (status === undefined || session.status === status)
+      (filter.paymentIntent === undefined ||
+        session.payment_intent === filter.paymentIntent) &&
+      (filter.customer === undefined || session.customer === filter.customer) &&
+      (filter.status === undefined || session.status === filter.status)
     ) {
       sessions.push(session);
     }
   }
 
-  const list = paginate(sessions, fields, '/v1/checkout/sessions');
+  return paginate(sessions, filter.page, '/v1/checkout/sessions');
+}
 
-  fields.done();
-
-  return list;
+export async function lineItems(
+  tx: Transaction,
+  id: string,
+): Promise<LineItem[]> {
+  return (await tx.get(lineCollection, id) ?? []) as LineItem[];
 }
 
 export async function listLineItems(
   tx: Transaction,
   id: string,
-  fields: Fields,
-) {
+  limit: number,
+): Promise<List<LineItem>> {
   await load<CheckoutSession>(tx, 'checkout.session', id, 'session');
 
-  const items = (await tx.get(lineCollection, id) ?? []) as LineItem[];
-  const limit = fields.int('limit', { min: 1, max: 100 }) ?? 10;
-
-  fields.done();
+  const items = await lineItems(tx, id);
 
   return {
-    object: 'list' as const,
+    object: 'list',
     data: items.slice(0, limit),
     has_more: items.length > limit,
     url: `/v1/checkout/sessions/${id}/line_items`,
@@ -528,8 +394,9 @@ export async function expireSession(
   tx: Transaction,
   id: string,
   now: number,
+  version: string,
 ): Promise<CheckoutSession> {
-  const session = await getSession(tx, id, now);
+  const session = await getSession(tx, id, now, version);
 
   if (session.status !== 'open') {
     throw invalidRequest(
@@ -541,7 +408,7 @@ export async function expireSession(
   const expired: CheckoutSession = { ...session, status: 'expired', url: null };
 
   await save(tx, expired);
-  await emit(tx, 'checkout.session.expired', expired, now);
+  await emit(tx, 'checkout.session.expired', expired, now, version);
 
   return expired;
 }
@@ -562,8 +429,9 @@ export async function completeSession(
   tx: Transaction,
   input: CompleteInput,
   now: number,
+  version: string,
 ): Promise<CheckoutSession> {
-  let session = await getSession(tx, input.id, now);
+  let session = await getSession(tx, input.id, now, version);
 
   if (session.status !== 'open') {
     throw invalidRequest(
@@ -585,7 +453,7 @@ export async function completeSession(
     );
   }
 
-  const items = (await tx.get(lineCollection, session.id) ?? []) as LineItem[];
+  const items = await lineItems(tx, session.id);
   let discount: Awaited<ReturnType<typeof redeemable>> | undefined;
 
   if (input.promotionCode !== undefined) {
@@ -664,7 +532,7 @@ export async function completeSession(
 
   if (customerId === null && session.customer_creation === 'always') {
     customerId =
-      (await insertCustomer(tx, { email, name: input.name }, now)).id;
+      (await insertCustomer(tx, { email, name: input.name }, now, version)).id;
   }
 
   const intent = amounts.total > 0
@@ -679,28 +547,17 @@ export async function completeSession(
 
   session = {
     ...session,
+    amount_discount: amounts.discount,
     amount_subtotal: amounts.subtotal,
     amount_total: amounts.total,
     customer: customerId,
-    customer_details: {
-      address: null,
-      email,
-      name: input.name ?? customer?.name ?? null,
-      phone: null,
-      tax_exempt: 'none',
-      tax_ids: [],
-    },
+    customer_details: { email, name: input.name ?? customer?.name ?? null },
     discounts: discount
       ? [{ coupon: null, promotion_code: discount.promotion.id }]
       : session.discounts,
     payment_intent: intent?.id ?? null,
     payment_status: intent ? 'paid' : 'no_payment_required',
     status: 'complete',
-    total_details: {
-      amount_discount: amounts.discount,
-      amount_shipping: 0,
-      amount_tax: 0,
-    },
     url: null,
   };
 
@@ -714,7 +571,7 @@ export async function completeSession(
       amount_total: item.amount_subtotal - amounts.perItem[index]!,
     })),
   });
-  await emit(tx, 'checkout.session.completed', session, now);
+  await emit(tx, 'checkout.session.completed', session, now, version);
 
   return session;
 }

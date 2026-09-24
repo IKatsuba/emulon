@@ -3,7 +3,7 @@ import { retryDelayMs, transport } from '../src/webhooks/mod.ts';
 
 Deno.test('Stripe exact-byte HMAC vector, wrong secret and tampered body', async () => {
   const body = new TextEncoder().encode('{"hello":"world"}');
-  const headers = await transport.headers({
+  const headers = await transport(new Map()).headers({
     body,
     id: 'unused',
     timestamp: 1700000000,

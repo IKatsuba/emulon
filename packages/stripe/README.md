@@ -28,7 +28,35 @@ const client = new Stripe(apiKey, {
 ```
 
 Only the connection options change; the rest of your integration code stays as
-it is. Other `Stripe-Version` values are rejected before anything changes.
+it is.
+
+## API versions
+
+Each instance serves the API versions it enables. Without options that is
+`2026-04-22.dahlia`, which is also the account default:
+
+```ts
+stripe({
+  apiVersions: ['2026-04-22.dahlia'],
+  defaultApiVersion: '2026-04-22.dahlia',
+});
+```
+
+A request's `Stripe-Version` selects that exact enabled version; without the
+header the account default applies, and every response names the version it
+used. Unknown, disabled, empty or malformed values fail with
+`invalid_request_error` before parameters are read, anything changes or an
+idempotency key is used; invalid credentials still fail first with 401. There is
+no fallback to another version and no `latest` alias.
+
+All versions share one state. An event shows the version of the request that
+caused it (commands and the hosted page use the account default), while each
+webhook endpoint receives events in its own pinned version. Commands that return
+Stripe objects accept `apiVersion` (`--api-version` on the CLI) and otherwise
+use the account default.
+
+If saved state still uses a version you remove from `apiVersions`, the instance
+refuses to start; enable the version again or run `emulon reset`.
 
 ## Sell something
 
@@ -110,7 +138,7 @@ The same operations are available on a project running `emulon up`:
 ```sh
 emulon stripe keys create --json
 emulon stripe customers create --email ada@example.test --json
-emulon stripe checkout sessions get cs_test_... --json
+emulon stripe checkout sessions get cs_test_... --api-version 2026-04-22.dahlia --json
 emulon stripe checkout sessions complete cs_test_... --promotion-code LAUNCH --json
 emulon stripe checkout sessions expire cs_test_... --json
 emulon stripe charges get ch_... --json
@@ -152,16 +180,24 @@ stripe({
     secret: 'whsec_local',
     types: ['checkout.session.completed', 'charge.refunded'],
     enabled: true,
+    apiVersion: '2026-04-22.dahlia',
   }],
 });
 ```
 
+`apiVersion` pins the endpoint's event format; a new endpoint without one takes
+the account default, and reconfiguring without one keeps the pinned version.
+Changing it affects only later deliveries. `webhooks destinations` lists each
+endpoint with its version and without its secret.
+
 Deliveries carry `Stripe-Signature` over the exact event bytes, keyed by the
-literal UTF-8 secret, so `stripe.webhooks.constructEventAsync` accepts them.
-Retries keep the bytes and event ID; the local schedule retries after 60
-seconds, 1 hour and 2 hours. Use `webhooks list`, `inspect`, `wait` and
-`redeliver` to observe and repeat deliveries, and `events publish` or
-`webhooks send` to deliver a synthetic event without changing state.
+literal UTF-8 secret, so `stripe.webhooks.constructEventAsync` accepts them. The
+body is fixed when the delivery is queued: retries, redelivery and restarts keep
+the bytes and event ID; the local schedule retries after 60 seconds, 1 hour and
+2 hours. Use `webhooks list`, `inspect`, `wait` and `redeliver` to observe and
+repeat deliveries, and `events publish` or `webhooks send` to deliver a
+synthetic event without changing state. A synthetic event must name an enabled
+version in `api_version` and match that version's event and object shape.
 
 ## Not supported
 

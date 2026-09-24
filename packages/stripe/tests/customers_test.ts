@@ -5,12 +5,10 @@ import { readRegistration } from '../../emulon/src/plugins/define.ts';
 import { memoryAdapter, type Store } from '../../emulon/src/state/store.ts';
 import { serveEnvironment } from '../../emulon/src/control/server.ts';
 import { runProjectCLI } from '../../emulon/src/cli/project.ts';
-import {
-  createCustomer,
-  expired,
-  fingerprint,
-  fixtures,
-} from '../src/model/customers.ts';
+import { expired, fingerprint, fixtures } from '../src/model/customers.ts';
+import type { CustomerCommandInput } from '../src/model/customers.ts';
+import { perform } from '../src/operations.ts';
+import { dahlia } from '../src/versions/dahlia/mod.ts';
 import { matchesKey } from '../src/auth/keys.ts';
 import { compatibility } from '../src/compatibility.ts';
 import {
@@ -39,6 +37,20 @@ async function rejects(action: () => unknown) {
   }
 
   throw new Error('Expected rejection');
+}
+
+/** Create a customer as the control command does, without a started host. */
+function createCustomer(
+  store: Store,
+  { idempotencyKey, ...input }: CustomerCommandInput,
+  now: () => number = Date.now,
+) {
+  return perform(store, dahlia, {
+    operation: 'customers.create',
+    path: '/v1/customers',
+    parsed: { input, expand: [] },
+    idempotencyKey,
+  }, now()) as Promise<{ id: string }>;
 }
 
 function observed() {
@@ -149,7 +161,8 @@ async function officialClientContract() {
 
   assert(snapshot.rows.length === 1 && snapshot.events.length === 1);
 
-  const event = snapshot.events[0]!.payload as {
+  // The store keeps a canonical fact; the event list shows its dahlia view.
+  const event = (await env.events.list({}))[0]!.payload as {
     id: string;
     api_version: string;
     data: { object: { id: string } };

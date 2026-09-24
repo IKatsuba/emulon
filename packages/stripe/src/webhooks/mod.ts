@@ -1,8 +1,13 @@
-// Stripe API fields are snake_case on the wire.
-// deno-lint-ignore-file camelcase
-import { z } from 'zod';
-import type { DeliveryTransport, SubscriptionPolicy } from 'emulon';
-import { version } from '../model/core.ts';
+import type {
+  DeliveryTransport,
+  Destination,
+  EventRecord,
+  PluginPresentation,
+  SubscriptionPolicy,
+} from 'emulon';
+import type { EventFact, Kind } from '../model/core.ts';
+import type { VersionConfig } from '../versions/select.ts';
+import type { StripeVersionModule } from '../versions/types.ts';
 
 export const eventTypes = [
   'customer.created',
@@ -15,8 +20,8 @@ export const eventTypes = [
 
 export type EventType = (typeof eventTypes)[number];
 
-/** The object each event type carries in `data.object`. */
-const objects: Record<EventType, string> = {
+/** The resource each event type carries. */
+export const eventObjects: Record<EventType, Kind> = {
   'customer.created': 'customer',
   'checkout.session.completed': 'checkout.session',
   'checkout.session.expired': 'checkout.session',
@@ -25,40 +30,24 @@ const objects: Record<EventType, string> = {
   'charge.dispute.closed': 'dispute',
 };
 
-export interface StripeEvent {
+/**
+ * The event envelope every API version shares, as commands accept it. The
+ * version named by `api_version` validates the rest.
+ */
+export interface EventInput {
   id: string;
   object: 'event';
-  api_version: typeof version;
+  'api_version': string;
   created: number;
   data: {
     object: Record<string, unknown>;
-    previous_attributes?: Record<string, unknown>;
+    'previous_attributes'?: Record<string, unknown>;
   };
   livemode: false;
-  pending_webhooks: number;
-  request: { id: string | null; idempotency_key: string | null };
+  'pending_webhooks': number;
+  request: { id: string | null; 'idempotency_key': string | null };
   type: EventType;
 }
-
-export const eventSchema: z.ZodType<StripeEvent, StripeEvent> = z.strictObject({
-  id: z.string().regex(/^evt_[a-zA-Z0-9]+$/),
-  object: z.literal('event'),
-  api_version: z.literal(version),
-  created: z.number().int().nonnegative(),
-  data: z.strictObject({
-    object: z.looseObject({ id: z.string(), object: z.string() }),
-    previous_attributes: z.record(z.string(), z.unknown()).optional(),
-  }),
-  livemode: z.literal(false),
-  pending_webhooks: z.number().int().nonnegative(),
-  request: z.strictObject({
-    id: z.string().nullable(),
-    idempotency_key: z.string().nullable(),
-  }),
-  type: z.enum(eventTypes),
-}).refine((event) => event.data.object.object === objects[event.type], {
-  message: 'Event object does not match its type.',
-}) as unknown as z.ZodType<StripeEvent, StripeEvent>;
 
 export const subscriptionPolicy: SubscriptionPolicy = {
   selection: 'processing-time',
@@ -69,38 +58,97 @@ export function retryDelayMs(attempt: number): number | undefined {
   return [60000, 3600000, 7200000][attempt - 1];
 }
 
-export const transport: DeliveryTransport = {
-  timeoutMs: 5000,
-  serialize: (event) =>
-    new TextEncoder().encode(JSON.stringify(eventSchema.parse(event.payload))),
-  async headers({ body, timestamp, secret }) {
-    const encoder = new TextEncoder();
-    const key = await crypto.subtle.importKey(
-      'raw',
-      encoder.encode(secret),
-      { name: 'HMAC', hash: 'SHA-256' },
-      false,
-      ['sign'],
-    );
-    const prefix = encoder.encode(`${timestamp}.`);
-    const content = new Uint8Array(prefix.length + body.length);
+/** The API version a webhook endpoint is pinned to. */
+export function endpointVersion(
+  destination: Pick<Destination, 'provider'>,
+): string {
+  const version = destination.provider?.apiVersion;
 
-    content.set(prefix);
-    content.set(body, prefix.length);
+  if (typeof version !== 'string') {
+    throw new Error('Webhook endpoint has no API version.');
+  }
 
-    const digest = new Uint8Array(
-      await crypto.subtle.sign('HMAC', key, content),
-    );
-    const signature = Array.from(
-      digest,
-      (byte) => byte.toString(16).padStart(2, '0'),
-    ).join('');
+  return version;
+}
 
-    return {
-      'content-type': 'application/json',
-      'stripe-signature': `t=${timestamp},v1=${signature}`,
-    };
-  },
-  succeeds: (status) => status >= 200 && status < 300,
-  retryDelayMs,
-};
+function body(
+  module: StripeVersionModule | undefined,
+  event: EventRecord,
+): Uint8Array<ArrayBuffer> {
+  if (module === undefined) {
+    throw new Error('Stripe API version is not enabled.');
+  }
+
+  return new TextEncoder().encode(
+    JSON.stringify(module.projectEvent(event.type, event.payload as EventFact)),
+  );
+}
+
+/**
+ * Events keep canonical facts. Event lists show each in the version of the
+ * request that caused it; each delivery body is projected once, in its
+ * endpoint's pinned version, and those bytes are what every attempt sends.
+ */
+export function presentation(
+  config: VersionConfig,
+  installed: ReadonlyMap<string, StripeVersionModule>,
+): PluginPresentation {
+  const enabled = (id: string) =>
+    config.versions.includes(id) ? installed.get(id) : undefined;
+
+  return {
+    eventView(event) {
+      const fact = event.payload as EventFact;
+      const module = enabled(fact.apiVersion);
+
+      if (module === undefined) {
+        throw new Error('Stripe API version is not enabled.');
+      }
+
+      return module.projectEvent(event.type, fact);
+    },
+    deliverySnapshot: (event, destination) =>
+      body(enabled(endpointVersion(destination)), event),
+  };
+}
+
+export function transport(
+  installed: ReadonlyMap<string, StripeVersionModule>,
+): DeliveryTransport {
+  return {
+    timeoutMs: 5000,
+    // Only reached without a captured snapshot: project the source view.
+    serialize: (event) =>
+      body(installed.get((event.payload as EventFact).apiVersion), event),
+    async headers({ body, timestamp, secret }) {
+      const encoder = new TextEncoder();
+      const key = await crypto.subtle.importKey(
+        'raw',
+        encoder.encode(secret),
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['sign'],
+      );
+      const prefix = encoder.encode(`${timestamp}.`);
+      const content = new Uint8Array(prefix.length + body.length);
+
+      content.set(prefix);
+      content.set(body, prefix.length);
+
+      const digest = new Uint8Array(
+        await crypto.subtle.sign('HMAC', key, content),
+      );
+      const signature = Array.from(
+        digest,
+        (byte) => byte.toString(16).padStart(2, '0'),
+      ).join('');
+
+      return {
+        'content-type': 'application/json',
+        'stripe-signature': `t=${timestamp},v1=${signature}`,
+      };
+    },
+    succeeds: (status) => status >= 200 && status < 300,
+    retryDelayMs,
+  };
+}

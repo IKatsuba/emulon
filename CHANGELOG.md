@@ -16,6 +16,11 @@ project adheres to [Semantic Versioning](https://semver.org/).
   resolves related objects.
 - `@emulon/stripe` commands to pay or expire a Checkout Session, refund a charge
   and open or close a dispute.
+- `@emulon/stripe` options `apiVersions` and `defaultApiVersion` select the
+  Stripe API versions an instance serves; `Stripe-Version` picks one per request
+  and the account default applies without it. Webhook endpoints pin an
+  `apiVersion`, shown by `webhooks destinations`, and commands that return
+  Stripe objects accept `apiVersion` (`--api-version`).
 - `emulon`: optional `PluginDefinition.presentation` hooks. `eventView` shapes
   the payload shown by event list and follow; `deliverySnapshot` captures the
   exact webhook body when a delivery is enqueued, and retries, redelivery and
@@ -28,7 +33,9 @@ project adheres to [Semantic Versioning](https://semver.org/).
   `2025-03-31.basil` and is verified with `stripe@22.1.1`. Customers carry the
   full object and accept `metadata` and `phone`.
 - `@emulon/stripe` exposes a second `web` endpoint and stores state in schema
-  version 2; state saved by earlier versions must be reset.
+  version 3, holding resources and events independently of an API version; state
+  saved by earlier versions must be reset. Unknown and disabled `Stripe-Version`
+  values fail before parameters are read.
 - `@emulon/stripe` command failures report the Stripe reason and code.
 
 ## [0.1.2] - 2026-09-23

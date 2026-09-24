@@ -1,3 +1,5 @@
+// Stripe API fields are snake_case on the wire.
+// deno-lint-ignore-file camelcase
 import Stripe from 'stripe';
 import stripe from '@emulon/stripe';
 import {
@@ -15,15 +17,15 @@ import {
   recoverAttempts,
 } from '../../emulon/src/deliveries/worker.ts';
 import {
-  eventSchema,
+  type EventInput,
   subscriptionPolicy,
   transport,
 } from '../src/webhooks/mod.ts';
-import {
-  createCustomer,
-  makeCustomer,
-  version,
-} from '../src/model/customers.ts';
+import { makeCustomer } from '../src/model/customers.ts';
+import type { EventFact, Store } from '../src/model/core.ts';
+import { perform } from '../src/operations.ts';
+import { dahlia } from '../src/versions/dahlia/mod.ts';
+import { projectRecord } from '../src/versions/dahlia/project.ts';
 import { caseRegistry } from '../../emulon/tests/helpers/compatibility.ts';
 import { serveEnvironment } from '../../emulon/src/control/server.ts';
 import { runProjectCLI } from '../../emulon/src/cli/project.ts';
@@ -44,8 +46,9 @@ async function rejects(action: () => unknown) {
   throw new Error('Expected rejection');
 }
 
+const version = dahlia.id;
 const secret = 'whsec_literal_utf8_£';
-const event = eventSchema.parse({
+const event: EventInput = {
   id: 'evt_synthetic',
   object: 'event',
   api_version: version,
@@ -54,8 +57,20 @@ const event = eventSchema.parse({
   livemode: false,
   pending_webhooks: 1,
   request: { id: null, idempotency_key: null },
-  data: { object: makeCustomer({}, 'cus_synthetic', 1700000000000) },
-});
+  data: {
+    object: projectRecord(makeCustomer({}, 'cus_synthetic', 1700000000000)),
+  },
+};
+// What the control commands record for it; core delivery sends facts.
+const fact: EventFact = dahlia.parseEvent(event.type, event);
+
+function createCustomer(store: Store, input: { name: string }) {
+  return perform(store, dahlia, {
+    operation: 'customers.create',
+    path: '/v1/customers',
+    parsed: { input, expand: [] },
+  }, Date.now());
+}
 
 function destination(url: string) {
   return {
@@ -126,7 +141,11 @@ async function retryContract() {
     fixtures: [destinationFixture(dest, subscriptionPolicy)],
   });
   const store = handle.store;
-  const worker = deliveryWorker(store, transport, timer);
+  const worker = deliveryWorker(
+    store,
+    transport(new Map([[dahlia.id, dahlia]])),
+    timer,
+  );
 
   try {
     await createCustomer(store, { name: 'One' });
@@ -200,7 +219,7 @@ async function retryContract() {
 
     const retrySuccess = await sendWebhook(store, {
       type: event.type,
-      data: event,
+      data: fact,
       destination: dest.id,
     });
 
@@ -223,7 +242,7 @@ async function retryContract() {
 
     const lost = await sendWebhook(store, {
       type: event.type,
-      data: event,
+      data: fact,
       destination: dest.id,
     });
 
@@ -256,7 +275,7 @@ async function retryContract() {
 
     const pending = await sendWebhook(store, {
       type: event.type,
-      data: event,
+      data: fact,
       destination: dest.id,
     });
 
@@ -272,7 +291,7 @@ async function retryContract() {
 
     const interrupted = await sendWebhook(store, {
       type: event.type,
-      data: event,
+      data: fact,
       destination: dest.id,
     });
 

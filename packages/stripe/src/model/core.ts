@@ -1,16 +1,18 @@
-// Stripe API fields are snake_case on the wire.
+// Stripe's domain terms are snake_case; records keep them as field names.
 // deno-lint-ignore-file camelcase
 import type { PluginContext } from 'emulon';
 import { invalidRequest, missing, StripeError } from '../errors.ts';
-import { Fields } from '../http/fields.ts';
-
-export const version = '2026-04-22.dahlia';
 
 export type Store = PluginContext['store'];
 export type Transaction = Parameters<Parameters<Store['transaction']>[0]>[0];
 export type Metadata = Record<string, string>;
-// deno-lint-ignore no-explicit-any
-export type StripeObject = { id: string; object: string } & Record<string, any>;
+
+/**
+ * A stored resource. Records hold the semantic state of a resource, not a
+ * Stripe wire object: version modules add constant fields, derive
+ * version-specific shapes and choose which properties are shown.
+ */
+export type ResourceRecord = { id: string; object: Kind };
 
 const alphabet =
   '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
@@ -65,7 +67,7 @@ const names: Record<Kind, string> = {
   dispute: 'dispute',
 };
 
-export async function find<T extends StripeObject>(
+export async function find<T extends ResourceRecord>(
   tx: Transaction,
   kind: Kind,
   id: string,
@@ -73,7 +75,7 @@ export async function find<T extends StripeObject>(
   return await tx.get(collections[kind], id) as T | undefined;
 }
 
-export async function load<T extends StripeObject>(
+export async function load<T extends ResourceRecord>(
   tx: Transaction,
   kind: Kind,
   id: string,
@@ -88,27 +90,46 @@ export async function load<T extends StripeObject>(
   return value;
 }
 
-export async function save(tx: Transaction, value: StripeObject) {
+export async function save<T extends ResourceRecord>(
+  tx: Transaction,
+  value: T,
+) {
   await tx.put({
-    collection: collections[value.object as Kind],
+    collection: collections[value.object],
     id: value.id,
     value,
   });
 }
 
-export async function all<T extends StripeObject>(
+export async function all<T extends ResourceRecord>(
   tx: Transaction,
   kind: Kind,
 ): Promise<T[]> {
   return (await tx.list(collections[kind])).map((row) => row.value as T);
 }
 
+/**
+ * The canonical fact behind a Stripe event, captured when it happens. Version
+ * modules project it into an event envelope; `apiVersion` names the view the
+ * source request selected, while each webhook endpoint projects its own.
+ */
+export interface EventFact {
+  id: string;
+  apiVersion: string;
+  created: number;
+  object: ResourceRecord;
+  previous?: Record<string, unknown>;
+  pendingWebhooks: number;
+  request: { id: string | null; idempotencyKey: string | null };
+}
+
 /** Record a Stripe event in the same transaction as the change it describes. */
 export async function emit(
   tx: Transaction,
   type: string,
-  object: StripeObject,
+  object: ResourceRecord,
   now: number,
+  version: string,
   previous?: Record<string, unknown>,
 ) {
   await tx.record({
@@ -117,21 +138,17 @@ export async function emit(
     origin: 'service',
     payload: {
       id: randomId('evt_'),
-      object: 'event',
-      api_version: version,
+      apiVersion: version,
       created: seconds(now),
-      data: {
-        object: structuredClone(object),
-        ...(previous ? { previous_attributes: previous } : {}),
-      },
-      livemode: false,
-      pending_webhooks: 1,
-      request: { id: null, idempotency_key: null },
-      type,
-    },
+      object: structuredClone(object),
+      ...(previous ? { previous } : {}),
+      pendingWebhooks: 1,
+      request: { id: null, idempotencyKey: null },
+    } satisfies EventFact,
   });
 }
 
+/** A canonical list page; version modules project each member. */
 export interface List<T> {
   object: 'list';
   data: T[];
@@ -139,24 +156,22 @@ export interface List<T> {
   url: string;
 }
 
+export interface Page {
+  limit: number;
+  startingAfter?: string | undefined;
+  endingBefore?: string | undefined;
+}
+
 /**
  * Newest-first pagination with `limit` (1-100, default 10) and
  * `starting_after`/`ending_before`, as every Stripe list endpoint accepts.
  */
-export function paginate<T extends StripeObject & { created: number }>(
+export function paginate<T extends { id: string; created: number }>(
   items: T[],
-  fields: Fields,
+  page: Page,
   url: string,
 ): List<T> {
-  const limit = fields.int('limit', { min: 1, max: 100 }) ?? 10;
-  const after = fields.string('starting_after');
-  const before = fields.string('ending_before');
-
-  if (after && before) {
-    throw invalidRequest(
-      'You may only specify one of these parameters: starting_after, ending_before.',
-    );
-  }
+  const { limit, startingAfter: after, endingBefore: before } = page;
 
   // Creation order breaks ties so pages never skip or repeat an object.
   const sorted = items.map((item, index) => ({ item, index }))
@@ -185,127 +200,74 @@ export function paginate<T extends StripeObject & { created: number }>(
   return { object: 'list', data: window, has_more, url };
 }
 
-/** Which collection an expandable property refers to. */
-const expandable: Record<string, Kind> = {
-  coupon: 'coupon',
-  customer: 'customer',
-  product: 'product',
-  price: 'price',
-  promotion_code: 'promotion_code',
-  payment_intent: 'payment_intent',
-  latest_charge: 'charge',
-  charge: 'charge',
-  default_price: 'price',
-};
+/** Canonical request identity, shared by HTTP and control commands. */
+export function fingerprint(method: string, path: string, input: unknown) {
+  const canonical = (value: unknown): unknown =>
+    value !== null && typeof value === 'object' && !Array.isArray(value)
+      ? Object.fromEntries(
+        Object.keys(value).sort()
+          .filter((key) =>
+            (value as Record<string, unknown>)[key] !== undefined
+          )
+          .map((key) => [
+            key,
+            canonical((value as Record<string, unknown>)[key]),
+          ]),
+      )
+      : Array.isArray(value)
+      ? value.map(canonical)
+      : value;
 
-/**
- * Replace ID strings with their objects along `expand[]` paths such as
- * `promotion.coupon` or `data.promotion.coupon`. Unknown or non-ID paths are
- * rejected like Stripe does, instead of being ignored.
- */
-export async function expand<T>(
-  tx: Transaction,
-  value: T,
-  paths: string[],
-): Promise<T> {
-  if (paths.length === 0) {
-    return value;
-  }
-
-  const result = structuredClone(value) as Record<string, unknown>;
-
-  for (const path of paths) {
-    if (path.split('.').length > 4) {
-      throw invalidRequest(
-        `You cannot expand more than 4 levels of a property: ${path}.`,
-        'expand',
-      );
-    }
-
-    await expandPath(tx, result, path.split('.'), path);
-  }
-
-  return result as T;
+  return JSON.stringify([method, path, canonical(input)]);
 }
 
-async function expandPath(
-  tx: Transaction,
-  node: unknown,
-  path: string[],
-  full: string,
-): Promise<void> {
-  const [head, ...rest] = path;
-
-  if (head === undefined || node === null || typeof node !== 'object') {
-    return;
-  }
-
-  const record = node as Record<string, unknown>;
-
-  if (head === 'data' && Array.isArray(record.data)) {
-    for (const item of record.data) {
-      await expandPath(tx, item, rest, full);
-    }
-
-    return;
-  }
-
-  if (!Object.hasOwn(record, head)) {
-    throw invalidRequest(
-      `This property cannot be expanded (${full}).`,
-      'expand',
-    );
-  }
-
-  if (rest.length > 0) {
-    await expandPath(tx, record[head], rest, full);
-
-    return;
-  }
-
-  const kind = expandable[head];
-  const current = record[head];
-
-  if (kind === undefined) {
-    throw invalidRequest(
-      `This property cannot be expanded (${full}).`,
-      'expand',
-    );
-  }
-
-  if (typeof current === 'string') {
-    record[head] = await find(tx, kind, current) ?? current;
-  }
+export function expired(created: number, now: number): boolean {
+  return now - created >= 86400000;
 }
 
-const idempotencySchema = (value: unknown) =>
-  value as { fingerprint: string; created: number; body: unknown };
+/** Look up the current view of a resource that a projection expands. */
+export type Resolver = (
+  kind: Kind,
+  id: string,
+) => Promise<ResourceRecord | undefined>;
+
+interface Saved {
+  fingerprint: string;
+  created: number;
+  result: unknown;
+  expanded: [Kind, string, ResourceRecord | null][];
+}
+
+const savedSchema = (value: unknown) => value as Saved;
 
 /**
- * Run a mutation once per idempotency key. The saved result commits with the
- * mutation, so concurrent requests with one key serialize and replay; a
- * failure rolls back and caches nothing.
+ * Run a mutation once per idempotency key. The canonical result and every
+ * resource its projection expanded commit with the mutation, so a replay
+ * projects the same snapshot without repeating state changes or events.
+ * Concurrent requests with one key serialize; a failure caches nothing.
  */
-export async function idempotent<T>(
+export async function idempotent(
   store: Store,
   key: string | undefined,
-  fingerprint: string,
+  identity: string,
   now: number,
-  work: (tx: Transaction) => Promise<T>,
-): Promise<T> {
+  work: (tx: Transaction) => Promise<unknown>,
+  present: (result: unknown, resolve: Resolver) => Promise<unknown>,
+  resolver: (tx: Transaction) => Resolver,
+): Promise<unknown> {
   return await store.transaction(async (tx) => {
     if (key !== undefined) {
       if (key.length === 0 || key.length > 255) {
         throw invalidRequest('Invalid idempotency key.', 'Idempotency-Key');
       }
 
-      const saved = await tx.get('idempotency', key);
+      const raw = await tx.get('idempotency', key);
 
-      if (saved !== undefined) {
-        const entry = idempotencySchema(saved);
+      if (raw !== undefined) {
+        const saved = savedSchema(raw);
 
-        if (now - entry.created < 86400000) {
-          if (entry.fingerprint !== fingerprint) {
+        if (!expired(saved.created, now)) {
+          if (saved.fingerprint !== identity) {
             throw new StripeError(
               400,
               'idempotency_error',
@@ -313,18 +275,43 @@ export async function idempotent<T>(
             );
           }
 
-          return entry.body as T;
+          const expanded = new Map(
+            saved.expanded.map(([kind, id, value]) => [
+              JSON.stringify([kind, id]),
+              value ?? undefined,
+            ]),
+          );
+
+          return await present(
+            saved.result,
+            (kind, id) =>
+              Promise.resolve(expanded.get(JSON.stringify([kind, id]))),
+          );
         }
       }
     }
 
-    const body = await work(tx);
+    const result = await work(tx);
+    const expanded: Saved['expanded'] = [];
+    const live = resolver(tx);
+    const body = await present(result, async (kind, id) => {
+      const value = await live(kind, id);
+
+      expanded.push([kind, id, value ?? null]);
+
+      return value;
+    });
 
     if (key !== undefined) {
       await tx.put({
         collection: 'idempotency',
         id: key,
-        value: { fingerprint, created: now, body },
+        value: {
+          fingerprint: identity,
+          created: now,
+          result,
+          expanded,
+        } satisfies Saved,
       });
     }
 

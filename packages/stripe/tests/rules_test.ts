@@ -5,6 +5,7 @@ import { Fields, mergeMetadata } from '../src/http/fields.ts';
 import { decodeParams, keyPath, parseParams } from '../src/http/form.ts';
 import { paginate, randomId } from '../src/model/core.ts';
 import { totals } from '../src/model/checkout.ts';
+import { readPage } from '../src/versions/common.ts';
 import { promotionActive } from '../src/model/discounts.ts';
 
 function assert(value: unknown, message = 'Assertion failed'): asserts value {
@@ -178,19 +179,27 @@ Deno.test('Stripe lists page newest first with stable cursors', () => {
     object: 'thing',
     created: Math.floor(index / 5),
   }));
-  const first = paginate(items, new Fields(parseParams('limit=10')), '/v1/x');
+  const first = paginate(
+    items,
+    readPage(new Fields(parseParams('limit=10'))),
+    '/v1/x',
+  );
 
   assert(first.data.length === 10 && first.has_more);
   assert(first.data[0]!.id === 'obj_24');
 
   const second = paginate(
     items,
-    new Fields(parseParams(`limit=10&starting_after=${first.data[9]!.id}`)),
+    readPage(
+      new Fields(parseParams(`limit=10&starting_after=${first.data[9]!.id}`)),
+    ),
     '/v1/x',
   );
   const third = paginate(
     items,
-    new Fields(parseParams(`limit=10&starting_after=${second.data[9]!.id}`)),
+    readPage(
+      new Fields(parseParams(`limit=10&starting_after=${second.data[9]!.id}`)),
+    ),
     '/v1/x',
   );
   const seen = [...first.data, ...second.data, ...third.data].map((x) => x.id);
@@ -199,15 +208,23 @@ Deno.test('Stripe lists page newest first with stable cursors', () => {
 
   const back = paginate(
     items,
-    new Fields(parseParams(`limit=5&ending_before=${second.data[0]!.id}`)),
+    readPage(
+      new Fields(parseParams(`limit=5&ending_before=${second.data[0]!.id}`)),
+    ),
     '/v1/x',
   );
 
   assert(back.data.at(-1)!.id === first.data[9]!.id);
-  assert(paginate(items, new Fields({}), '/v1/x').data.length === 10);
-  fails(() => paginate(items, new Fields(parseParams('limit=101')), '/v1/x'));
+  assert(paginate(items, readPage(new Fields({})), '/v1/x').data.length === 10);
   fails(() =>
-    paginate(items, new Fields(parseParams('starting_after=nope')), '/v1/x')
+    paginate(items, readPage(new Fields(parseParams('limit=101'))), '/v1/x')
+  );
+  fails(() =>
+    paginate(
+      items,
+      readPage(new Fields(parseParams('starting_after=nope'))),
+      '/v1/x',
+    )
   );
 });
 

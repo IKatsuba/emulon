@@ -1,12 +1,13 @@
-// Stripe API fields are snake_case on the wire.
+// Stripe's domain terms are snake_case; records keep them as field names.
 // deno-lint-ignore-file camelcase
 import { invalidRequest, StripeError } from '../errors.ts';
-import { type Fields, mergeMetadata } from '../http/fields.ts';
+import { mergeMetadata } from '../http/fields.ts';
 import {
   all,
   find,
   load,
   type Metadata,
+  type Page,
   paginate,
   randomId,
   save,
@@ -24,28 +25,32 @@ export interface Coupon {
   currency: string | null;
   duration: 'forever' | 'once' | 'repeating';
   duration_in_months: number | null;
-  livemode: false;
   max_redemptions: number | null;
   metadata: Metadata;
   name: string | null;
   percent_off: number | null;
   redeem_by: number | null;
   times_redeemed: number;
-  valid: boolean;
 }
 
+/** A coupon as read: whether it can still be redeemed depends on the clock. */
+export type CouponView = Coupon & { valid: boolean };
+
+/**
+ * A promotion code for one coupon. `enabled` is the merchant's switch;
+ * whether the code is active is derived on read.
+ */
 export interface PromotionCode {
   id: string;
   object: 'promotion_code';
-  active: boolean;
   code: string;
+  coupon: string;
   created: number;
   customer: string | null;
+  enabled: boolean;
   expires_at: number | null;
-  livemode: false;
   max_redemptions: number | null;
   metadata: Metadata;
-  promotion: { type: 'coupon'; coupon: string | Coupon };
   restrictions: {
     first_time_transaction: boolean;
     minimum_amount: number | null;
@@ -54,14 +59,57 @@ export interface PromotionCode {
   times_redeemed: number;
 }
 
-/** Stored codes keep the merchant's switch; `active` is derived on read. */
-type StoredPromotionCode = PromotionCode & { enabled: boolean };
+export type PromotionCodeView = PromotionCode & { active: boolean };
 
-const couponId = /^[a-zA-Z0-9_-]{1,255}$/;
-const codeFormat = /^[a-zA-Z0-9_-]{1,500}$/;
+export interface CouponInput {
+  id?: string | undefined;
+  percentOff?: number | undefined;
+  amountOff?: number | undefined;
+  currency?: string | undefined;
+  duration: Coupon['duration'];
+  durationInMonths?: number | undefined;
+  products?: string[] | undefined;
+  redeemBy?: number | undefined;
+  maxRedemptions?: number | undefined;
+  metadata?: Metadata | undefined;
+  name?: string | undefined;
+}
+
+export interface PromotionCodeInput {
+  coupon: string;
+  code?: string | undefined;
+  active?: boolean | undefined;
+  customer?: string | undefined;
+  expiresAt?: number | undefined;
+  maxRedemptions?: number | undefined;
+  metadata?: Metadata | undefined;
+  firstTimeTransaction?: boolean | undefined;
+  minimumAmount?: number | undefined;
+  minimumAmountCurrency?: string | undefined;
+}
+
+export interface PromotionCodeUpdate {
+  active?: boolean | undefined;
+  metadata?: Metadata | undefined;
+}
+
+export interface PromotionCodeFilter {
+  active?: boolean | undefined;
+  code?: string | undefined;
+  coupon?: string | undefined;
+  customer?: string | undefined;
+  page: Page;
+}
+
+/** The parameter that names a promotion code's coupon, before projection. */
+export const couponParam = 'coupon';
+
 const codeAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
-export function couponValid(coupon: Coupon, now: number): boolean {
+export function couponValid(
+  coupon: Pick<Coupon, 'redeem_by' | 'max_redemptions' | 'times_redeemed'>,
+  now: number,
+): boolean {
   return (coupon.redeem_by === null || coupon.redeem_by > seconds(now)) &&
     (coupon.max_redemptions === null ||
       coupon.times_redeemed < coupon.max_redemptions);
@@ -72,8 +120,13 @@ export function couponValid(coupon: Coupon, now: number): boolean {
  * with redemptions left and an existing, valid coupon behind it.
  */
 export function promotionActive(
-  code: StoredPromotionCode,
-  coupon: Coupon | undefined,
+  code: Pick<
+    PromotionCode,
+    'enabled' | 'expires_at' | 'max_redemptions' | 'times_redeemed'
+  >,
+  coupon:
+    | Pick<Coupon, 'redeem_by' | 'max_redemptions' | 'times_redeemed'>
+    | undefined,
   now: number,
 ): boolean {
   return code.enabled &&
@@ -83,102 +136,47 @@ export function promotionActive(
     coupon !== undefined && couponValid(coupon, now);
 }
 
-async function present(
-  tx: Transaction,
-  code: StoredPromotionCode,
-  now: number,
-): Promise<PromotionCode> {
-  const { enabled: _, ...visible } = code;
-  const coupon = await find<Coupon>(
-    tx,
-    'coupon',
-    code.promotion.coupon as string,
-  );
+export function viewCoupon(coupon: Coupon, now: number): CouponView {
+  return { ...coupon, valid: couponValid(coupon, now) };
+}
 
-  return { ...visible, active: promotionActive(code, coupon, now) };
+export async function viewPromotionCode(
+  tx: Transaction,
+  code: PromotionCode,
+  now: number,
+): Promise<PromotionCodeView> {
+  const coupon = await find<Coupon>(tx, 'coupon', code.coupon);
+
+  return { ...code, active: promotionActive(code, coupon, now) };
 }
 
 export async function createCoupon(
   tx: Transaction,
-  fields: Fields,
+  input: CouponInput,
   now: number,
-): Promise<Coupon> {
-  const id = fields.string('id', { max: 255 });
-  const percentOff = fields.decimal('percent_off', { min: 0, max: 100 });
-  const amountOff = fields.int('amount_off', { min: 1 });
-  const currency = fields.string('currency');
-  const duration = fields.oneOf('duration', ['forever', 'once', 'repeating']) ??
-    'once';
-  const months = fields.int('duration_in_months', { min: 1, max: 12 });
-  const appliesTo = fields.object('applies_to');
-  const products = appliesTo?.strings('products');
-  const redeemBy = fields.int('redeem_by', { min: 0 });
+): Promise<CouponView> {
   const coupon: Coupon = {
-    id: id ?? randomId('', 8).toUpperCase(),
+    id: input.id ?? randomId('', 8).toUpperCase(),
     object: 'coupon',
-    amount_off: amountOff ?? null,
+    amount_off: input.amountOff ?? null,
     created: seconds(now),
-    currency: currency?.toLowerCase() ?? null,
-    duration,
-    duration_in_months: months ?? null,
-    livemode: false,
-    max_redemptions: fields.int('max_redemptions', { min: 1 }) ?? null,
-    metadata: fields.metadata() ?? {},
-    name: fields.string('name', { max: 40 }) ?? null,
-    percent_off: percentOff ?? null,
-    redeem_by: redeemBy ?? null,
+    currency: input.currency ?? null,
+    duration: input.duration,
+    duration_in_months: input.durationInMonths ?? null,
+    max_redemptions: input.maxRedemptions ?? null,
+    metadata: input.metadata ?? {},
+    name: input.name ?? null,
+    percent_off: input.percentOff ?? null,
+    redeem_by: input.redeemBy ?? null,
     times_redeemed: 0,
-    valid: true,
   };
 
-  appliesTo?.done();
-  fields.done();
-
-  if (id !== undefined && !couponId.test(id)) {
-    throw invalidRequest('Invalid coupon id.', 'id');
-  }
-
-  if ((percentOff === undefined) === (amountOff === undefined)) {
-    throw invalidRequest(
-      'You must pass exactly one of percent_off or amount_off.',
-      percentOff === undefined ? 'percent_off' : 'amount_off',
-    );
-  }
-
-  if (percentOff !== undefined && percentOff <= 0) {
-    throw invalidRequest(
-      'percent_off must be greater than 0.',
-      'percent_off',
-    );
-  }
-
-  if (amountOff !== undefined && currency === undefined) {
-    throw invalidRequest(
-      'You must pass currency when passing amount_off.',
-      'currency',
-    );
-  }
-
-  if (percentOff !== undefined && currency !== undefined) {
-    throw invalidRequest(
-      'currency is only used with amount_off.',
-      'currency',
-    );
-  }
-
-  if ((duration === 'repeating') !== (months !== undefined)) {
-    throw invalidRequest(
-      'duration_in_months is required for, and only valid with, a repeating duration.',
-      'duration_in_months',
-    );
-  }
-
-  if (redeemBy !== undefined && redeemBy <= seconds(now)) {
+  if (input.redeemBy !== undefined && input.redeemBy <= seconds(now)) {
     throw invalidRequest('redeem_by must be in the future.', 'redeem_by');
   }
 
-  if (products !== undefined) {
-    for (const [index, product] of products.entries()) {
+  if (input.products !== undefined) {
+    for (const [index, product] of input.products.entries()) {
       await load<Product>(
         tx,
         'product',
@@ -187,7 +185,7 @@ export async function createCoupon(
       );
     }
 
-    coupon.applies_to = { products };
+    coupon.applies_to = { products: input.products };
   }
 
   if (await find(tx, 'coupon', coupon.id)) {
@@ -201,7 +199,7 @@ export async function createCoupon(
 
   await save(tx, coupon);
 
-  return coupon;
+  return viewCoupon(coupon, now);
 }
 
 export async function deleteCoupon(tx: Transaction, id: string) {
@@ -212,9 +210,7 @@ export async function deleteCoupon(tx: Transaction, id: string) {
 }
 
 export async function getCoupon(tx: Transaction, id: string, now: number) {
-  const coupon = await load<Coupon>(tx, 'coupon', id);
-
-  return { ...coupon, valid: couponValid(coupon, now) };
+  return viewCoupon(await load<Coupon>(tx, 'coupon', id), now);
 }
 
 function generateCode(): string {
@@ -229,12 +225,12 @@ async function activeCodeExists(
   now: number,
   except?: string,
 ) {
-  for (const other of await all<StoredPromotionCode>(tx, 'promotion_code')) {
+  for (const other of await all<PromotionCode>(tx, 'promotion_code')) {
     if (
       other.id !== except && other.code.toLowerCase() === code.toLowerCase() &&
       promotionActive(
         other,
-        await find<Coupon>(tx, 'coupon', other.promotion.coupon as string),
+        await find<Coupon>(tx, 'coupon', other.coupon),
         now,
       )
     ) {
@@ -247,88 +243,40 @@ async function activeCodeExists(
 
 export async function createPromotionCode(
   tx: Transaction,
-  fields: Fields,
+  input: PromotionCodeInput,
   now: number,
-): Promise<PromotionCode> {
-  const promotion = fields.object('promotion');
-
-  if (promotion === undefined) {
-    throw invalidRequest(
-      'Missing required param: promotion.',
-      'promotion',
-      'parameter_missing',
-    );
-  }
-
-  if (promotion.oneOf('type', ['coupon']) === undefined) {
-    throw invalidRequest(
-      'Missing required param: promotion[type].',
-      'promotion[type]',
-      'parameter_missing',
-    );
-  }
-
-  const couponRef = promotion.required('coupon');
-  const code = fields.string('code', { max: 500 });
-  const expiresAt = fields.int('expires_at', { min: 0 });
-  const customer = fields.string('customer');
-  const restrictions = fields.object('restrictions');
-  const minimum = restrictions?.int('minimum_amount', { min: 1 });
-  const minimumCurrency = restrictions?.string('minimum_amount_currency');
-  const stored: StoredPromotionCode = {
+): Promise<PromotionCodeView> {
+  const stored: PromotionCode = {
     id: randomId('promo_'),
     object: 'promotion_code',
-    active: true,
-    enabled: fields.bool('active') ?? true,
-    code: code ?? generateCode(),
+    code: input.code ?? generateCode(),
+    coupon: input.coupon,
     created: seconds(now),
-    customer: customer ?? null,
-    expires_at: expiresAt ?? null,
-    livemode: false,
-    max_redemptions: fields.int('max_redemptions', { min: 1 }) ?? null,
-    metadata: fields.metadata() ?? {},
-    promotion: { type: 'coupon', coupon: couponRef },
+    customer: input.customer ?? null,
+    enabled: input.active ?? true,
+    expires_at: input.expiresAt ?? null,
+    max_redemptions: input.maxRedemptions ?? null,
+    metadata: input.metadata ?? {},
     restrictions: {
-      first_time_transaction: restrictions?.bool('first_time_transaction') ??
-        false,
-      minimum_amount: minimum ?? null,
-      minimum_amount_currency: minimumCurrency?.toLowerCase() ?? null,
+      first_time_transaction: input.firstTimeTransaction ?? false,
+      minimum_amount: input.minimumAmount ?? null,
+      minimum_amount_currency: input.minimumAmountCurrency ?? null,
     },
     times_redeemed: 0,
   };
-
-  promotion.done();
-  restrictions?.done();
-  fields.done();
-
-  if (code !== undefined && !codeFormat.test(code)) {
-    throw invalidRequest(
-      'Promotion codes may contain only letters, digits, - and _.',
-      'code',
-    );
-  }
-
-  const coupon = await load<Coupon>(
-    tx,
-    'coupon',
-    couponRef,
-    'promotion[coupon]',
-  );
+  const coupon = await load<Coupon>(tx, 'coupon', input.coupon, couponParam);
 
   if (!couponValid(coupon, now)) {
-    throw invalidRequest(
-      'This coupon is no longer valid.',
-      'promotion[coupon]',
-    );
+    throw invalidRequest('This coupon is no longer valid.', couponParam);
   }
 
-  if (expiresAt !== undefined && expiresAt <= seconds(now)) {
+  if (input.expiresAt !== undefined && input.expiresAt <= seconds(now)) {
     throw invalidRequest('expires_at must be in the future.', 'expires_at');
   }
 
   if (
-    expiresAt !== undefined && coupon.redeem_by !== null &&
-    expiresAt > coupon.redeem_by
+    input.expiresAt !== undefined && coupon.redeem_by !== null &&
+    input.expiresAt > coupon.redeem_by
   ) {
     throw invalidRequest(
       "The promotion code's expires_at must not be after the coupon's redeem_by.",
@@ -336,20 +284,11 @@ export async function createPromotionCode(
     );
   }
 
-  if ((minimum === undefined) !== (minimumCurrency === undefined)) {
-    throw invalidRequest(
-      'minimum_amount and minimum_amount_currency must be passed together.',
-      'restrictions',
-    );
+  if (input.customer !== undefined) {
+    await load(tx, 'customer', input.customer, 'customer');
   }
 
-  if (customer !== undefined) {
-    await load(tx, 'customer', customer, 'customer');
-  }
-
-  if (
-    stored.enabled && await activeCodeExists(tx, stored.code, now)
-  ) {
+  if (stored.enabled && await activeCodeExists(tx, stored.code, now)) {
     throw invalidRequest(
       'An active promotion code with this code already exists.',
       'code',
@@ -358,27 +297,24 @@ export async function createPromotionCode(
 
   await save(tx, stored);
 
-  return await present(tx, stored, now);
+  return await viewPromotionCode(tx, stored, now);
 }
 
 export async function updatePromotionCode(
   tx: Transaction,
   id: string,
-  fields: Fields,
+  input: PromotionCodeUpdate,
   now: number,
-): Promise<PromotionCode> {
-  const stored = await load<StoredPromotionCode>(tx, 'promotion_code', id);
-  const active = fields.bool('active');
-  const next = {
+): Promise<PromotionCodeView> {
+  const stored = await load<PromotionCode>(tx, 'promotion_code', id);
+  const next: PromotionCode = {
     ...stored,
-    metadata: mergeMetadata(stored.metadata, fields.metadata()),
+    metadata: mergeMetadata(stored.metadata, input.metadata),
   };
 
-  fields.done();
-
-  if (active !== undefined) {
+  if (input.active !== undefined) {
     if (
-      active && !stored.enabled &&
+      input.active && !stored.enabled &&
       await activeCodeExists(tx, stored.code, now, stored.id)
     ) {
       throw invalidRequest(
@@ -387,56 +323,48 @@ export async function updatePromotionCode(
       );
     }
 
-    next.enabled = active;
+    next.enabled = input.active;
   }
 
   await save(tx, next);
 
-  return await present(tx, next, now);
+  return await viewPromotionCode(tx, next, now);
 }
 
 export async function getPromotionCode(
   tx: Transaction,
   id: string,
   now: number,
-): Promise<PromotionCode> {
-  return await present(
+): Promise<PromotionCodeView> {
+  return await viewPromotionCode(
     tx,
-    await load<StoredPromotionCode>(tx, 'promotion_code', id),
+    await load<PromotionCode>(tx, 'promotion_code', id),
     now,
   );
 }
 
 export async function listPromotionCodes(
   tx: Transaction,
-  fields: Fields,
+  filter: PromotionCodeFilter,
   now: number,
 ) {
-  const active = fields.bool('active');
-  const code = fields.string('code');
-  const coupon = fields.string('coupon');
-  const customer = fields.string('customer');
-  const codes: PromotionCode[] = [];
+  const codes: PromotionCodeView[] = [];
 
-  for (const stored of await all<StoredPromotionCode>(tx, 'promotion_code')) {
-    const visible = await present(tx, stored, now);
+  for (const stored of await all<PromotionCode>(tx, 'promotion_code')) {
+    const visible = await viewPromotionCode(tx, stored, now);
 
     if (
-      (active === undefined || visible.active === active) &&
-      (code === undefined ||
-        visible.code.toLowerCase() === code.toLowerCase()) &&
-      (coupon === undefined || visible.promotion.coupon === coupon) &&
-      (customer === undefined || visible.customer === customer)
+      (filter.active === undefined || visible.active === filter.active) &&
+      (filter.code === undefined ||
+        visible.code.toLowerCase() === filter.code.toLowerCase()) &&
+      (filter.coupon === undefined || visible.coupon === filter.coupon) &&
+      (filter.customer === undefined || visible.customer === filter.customer)
     ) {
       codes.push(visible);
     }
   }
 
-  const list = paginate(codes, fields, '/v1/promotion_codes');
-
-  fields.done();
-
-  return list;
+  return paginate(codes, filter.page, '/v1/promotion_codes');
 }
 
 /** Resolve a code a buyer typed into a redeemable promotion code and coupon. */
@@ -445,29 +373,23 @@ export async function redeemable(
   reference: { id?: string; code?: string },
   now: number,
   param: string,
-): Promise<{ promotion: StoredPromotionCode; coupon: Coupon }> {
-  let promotion: StoredPromotionCode | undefined;
+): Promise<{ promotion: PromotionCode; coupon: Coupon }> {
+  let promotion: PromotionCode | undefined;
 
   if (reference.id !== undefined) {
-    promotion = await load<StoredPromotionCode>(
+    promotion = await load<PromotionCode>(
       tx,
       'promotion_code',
       reference.id,
       param,
     );
   } else {
-    for (
-      const candidate of await all<StoredPromotionCode>(tx, 'promotion_code')
-    ) {
+    for (const candidate of await all<PromotionCode>(tx, 'promotion_code')) {
       if (
         candidate.code.toLowerCase() === reference.code?.toLowerCase() &&
         promotionActive(
           candidate,
-          await find<Coupon>(
-            tx,
-            'coupon',
-            candidate.promotion.coupon as string,
-          ),
+          await find<Coupon>(tx, 'coupon', candidate.coupon),
           now,
         )
       ) {
@@ -477,7 +399,7 @@ export async function redeemable(
   }
 
   const coupon = promotion &&
-    await find<Coupon>(tx, 'coupon', promotion.promotion.coupon as string);
+    await find<Coupon>(tx, 'coupon', promotion.coupon);
 
   if (!promotion || !promotionActive(promotion, coupon, now) || !coupon) {
     throw invalidRequest('This promotion code is not active.', param);
@@ -489,7 +411,7 @@ export async function redeemable(
 /** Count a redemption on both the code and its coupon. */
 export async function redeem(
   tx: Transaction,
-  promotion: StoredPromotionCode,
+  promotion: PromotionCode,
   coupon: Coupon,
 ) {
   await save(tx, {

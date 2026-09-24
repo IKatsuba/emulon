@@ -7,6 +7,7 @@ import {
   completeSession,
   getSession,
   type LineItem,
+  lineItems,
 } from '../model/checkout.ts';
 import type { Customer } from '../model/customers.ts';
 
@@ -67,7 +68,7 @@ label{display:block;margin:.75rem 0 .25rem}input{width:100%;padding:.5rem;box-si
 <p class="note">Emulated by emulon. No card is charged.</p>
 <table>${lines}
 <tr><td>Discount</td><td>−${
-    money(session.total_details.amount_discount, session.currency)
+    money(session.amount_discount, session.currency)
   }</td></tr>
 <tr><th align="left">Total</th><th align="right">${
     money(session.amount_total, session.currency)
@@ -95,9 +96,14 @@ ${
 </body></html>`;
 }
 
-async function view(tx: Transaction, id: string, now: number) {
-  const session = await getSession(tx, id, now);
-  const items = (await tx.get('checkout_line_items', id) ?? []) as LineItem[];
+async function view(
+  tx: Transaction,
+  id: string,
+  now: number,
+  version: string,
+) {
+  const session = await getSession(tx, id, now, version);
+  const items = await lineItems(tx, id);
   const customer = session.customer
     ? await find<Customer>(tx, 'customer', session.customer)
     : undefined;
@@ -111,12 +117,19 @@ async function view(tx: Transaction, id: string, now: number) {
   };
 }
 
-/** The hosted payment page a Checkout Session's `url` points to. */
-export function checkoutPage(ctx: PluginContext, web: Hono) {
+/**
+ * The hosted payment page a Checkout Session's `url` points to. It is not an
+ * API request, so the events it causes are viewed in the account default.
+ */
+export function checkoutPage(
+  ctx: PluginContext,
+  web: Hono,
+  version: string,
+) {
   web.get('/c/pay/:id', async (c) => {
     try {
       const state = await ctx.store.scope().transaction((tx) =>
-        view(tx, c.req.param('id'), ctx.clock.now())
+        view(tx, c.req.param('id'), ctx.clock.now(), version)
       );
 
       return c.html(
@@ -155,15 +168,22 @@ export function checkoutPage(ctx: PluginContext, web: Hono) {
         const now = ctx.clock.now();
 
         if (text('action') === 'cancel') {
-          return { redirect: (await getSession(tx, id, now)).cancel_url };
+          return {
+            redirect: (await getSession(tx, id, now, version)).cancel_url,
+          };
         }
 
-        const session = await completeSession(tx, {
-          id,
-          email: text('email'),
-          name: text('name'),
-          promotionCode: text('promotion_code'),
-        }, now);
+        const session = await completeSession(
+          tx,
+          {
+            id,
+            email: text('email'),
+            name: text('name'),
+            promotionCode: text('promotion_code'),
+          },
+          now,
+          version,
+        );
 
         await tx.delete(tokens, id);
 
@@ -179,7 +199,7 @@ export function checkoutPage(ctx: PluginContext, web: Hono) {
       }
 
       const state = await store.transaction((tx) =>
-        view(tx, id, ctx.clock.now())
+        view(tx, id, ctx.clock.now(), version)
       ).catch(() => undefined);
 
       if (state === undefined) {

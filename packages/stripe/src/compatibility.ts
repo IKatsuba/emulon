@@ -376,8 +376,9 @@ export const compatibility: CompatibilityManifest = defineCompatibility({
       'id': version,
       'accepted': [version],
       'headers': ['stripe-version'],
-      'missing': `Select ${version}`,
-      'unknown': '400 invalid_request_error before mutation',
+      'missing': 'Select the instance account default',
+      'unknown':
+        '400 invalid_request_error for unknown or disabled versions before mutation',
     },
   ],
   'authentication': {
