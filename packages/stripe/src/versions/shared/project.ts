@@ -12,11 +12,11 @@ import type {
   Refund,
 } from '../../model/payments.ts';
 import { expandPaths } from '../common.ts';
-import type * as Dahlia from './wire.ts';
+import type * as Shared from '../wire.ts';
 
 type Wire = Record<string, unknown>;
 
-function customer(r: Customer): Dahlia.Customer {
+function customer(r: Customer): Shared.Customer {
   return {
     id: r.id,
     object: 'customer',
@@ -96,7 +96,7 @@ function price(r: Price): Wire {
   };
 }
 
-function coupon(r: CouponView): Wire {
+export function coupon(r: CouponView): Wire {
   return {
     id: r.id,
     object: 'coupon',
@@ -119,7 +119,8 @@ function coupon(r: CouponView): Wire {
   };
 }
 
-function promotionCode(r: PromotionCodeView): Wire {
+/** The promotion code fields every version shows the same way. */
+export function promotionCodeFields(r: PromotionCodeView): Wire {
   return {
     id: r.id,
     object: 'promotion_code',
@@ -131,13 +132,12 @@ function promotionCode(r: PromotionCodeView): Wire {
     livemode: false,
     max_redemptions: r.max_redemptions,
     metadata: { ...r.metadata },
-    promotion: { type: 'coupon', coupon: r.coupon },
     restrictions: { ...r.restrictions },
     times_redeemed: r.times_redeemed,
   };
 }
 
-function session(r: CheckoutSession): Dahlia.CheckoutSession {
+function session(r: CheckoutSession): Shared.CheckoutSession {
   return {
     id: r.id,
     object: 'checkout.session',
@@ -195,7 +195,7 @@ function lineItem(r: LineItem): Wire {
   };
 }
 
-function paymentIntent(r: PaymentIntent): Dahlia.PaymentIntent {
+function paymentIntent(r: PaymentIntent): Shared.PaymentIntent {
   return {
     id: r.id,
     object: 'payment_intent',
@@ -219,7 +219,7 @@ function paymentIntent(r: PaymentIntent): Dahlia.PaymentIntent {
   };
 }
 
-function charge(r: Charge): Dahlia.Charge {
+function charge(r: Charge): Shared.Charge {
   return {
     id: r.id,
     object: 'charge',
@@ -259,7 +259,7 @@ function charge(r: Charge): Dahlia.Charge {
   };
 }
 
-function refund(r: Refund): Dahlia.Refund {
+function refund(r: Refund): Shared.Refund {
   return {
     id: r.id,
     object: 'refund',
@@ -274,7 +274,7 @@ function refund(r: Refund): Dahlia.Refund {
   };
 }
 
-function dispute(r: Dispute): Dahlia.Dispute {
+function dispute(r: Dispute): Shared.Dispute {
   return {
     id: r.id,
     object: 'dispute',
@@ -299,12 +299,17 @@ function dispute(r: Dispute): Dahlia.Dispute {
 }
 
 // deno-lint-ignore no-explicit-any
-const projections: Record<Kind | 'item', (record: any) => object> = {
+type Projection = (record: any) => object;
+
+/** Objects whose shape is the same in every shipped version. */
+const projections: Record<
+  Exclude<Kind, 'promotion_code'> | 'item',
+  Projection
+> = {
   customer,
   product,
   price,
   coupon,
-  promotion_code: promotionCode,
   'checkout.session': session,
   item: lineItem,
   payment_intent: paymentIntent,
@@ -313,8 +318,8 @@ const projections: Record<Kind | 'item', (record: any) => object> = {
   dispute,
 };
 
-/** Properties of dahlia objects that name another resource. */
-const expandable: Record<string, Kind> = {
+/** Properties that name another resource in the shared objects. */
+export const references: Readonly<Record<string, Kind>> = {
   coupon: 'coupon',
   customer: 'customer',
   product: 'product',
@@ -326,31 +331,63 @@ const expandable: Record<string, Kind> = {
   default_price: 'price',
 };
 
-/**
- * A stored record as a dahlia object. Coupons and promotion codes are
- * projected from their views, which carry the derived `valid` and `active`.
- */
-export function projectRecord(record: ResourceRecord | LineItem): Wire {
+/** An object every event type carries, the same in every shipped version. */
+export function projectEventObject(record: ResourceRecord): Wire {
+  if (record.object === 'promotion_code') {
+    throw new Error('Promotion codes are projected by their version.');
+  }
+
   return projections[record.object](record) as Wire;
 }
 
-export async function project(
-  result: unknown,
-  expand: readonly string[],
-  resolve: Resolver,
-): Promise<unknown> {
-  const value = result as { object: string; deleted?: true };
-  let wire: unknown;
+export interface Projector {
+  /** A stored record, or a coupon or promotion code view, as an object. */
+  projectRecord(record: ResourceRecord | LineItem): Wire;
+  project(
+    result: unknown,
+    expand: readonly string[],
+    resolve: Resolver,
+  ): Promise<unknown>;
+}
 
-  if (value.object === 'list') {
-    const list = result as { data: (ResourceRecord | LineItem)[] } & Wire;
-
-    wire = { ...list, data: list.data.map(projectRecord) };
-  } else if (value.deleted) {
-    wire = { ...value };
-  } else {
-    wire = projectRecord(result as ResourceRecord);
+/**
+ * The projection of one version: shared objects plus its own promotion code,
+ * and the properties that expand. `expandable` sees the owning object's type,
+ * since a property can be a reference in one object and embedded in another.
+ */
+export function projector(
+  promotionCode: (record: PromotionCodeView) => Wire,
+  expandable: (owner: string | undefined, property: string) => Kind | undefined,
+): Projector {
+  function projectRecord(record: ResourceRecord | LineItem): Wire {
+    return record.object === 'promotion_code'
+      ? promotionCode(record as PromotionCodeView)
+      : projections[record.object](record) as Wire;
   }
 
-  return await expandPaths(wire, expand, expandable, resolve, projectRecord);
+  return {
+    projectRecord,
+    async project(result, expand, resolve) {
+      const value = result as { object: string; deleted?: true };
+      let wire: unknown;
+
+      if (value.object === 'list') {
+        const list = result as { data: (ResourceRecord | LineItem)[] } & Wire;
+
+        wire = { ...list, data: list.data.map(projectRecord) };
+      } else if (value.deleted) {
+        wire = { ...value };
+      } else {
+        wire = projectRecord(result as ResourceRecord);
+      }
+
+      return await expandPaths(
+        wire,
+        expand,
+        expandable,
+        resolve,
+        projectRecord,
+      );
+    },
+  };
 }

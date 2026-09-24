@@ -36,13 +36,14 @@ export function readPage(fields: Fields): Page {
 /**
  * Replace ID strings with projected objects along `expand[]` paths such as
  * `promotion.coupon` or `data.promotion.coupon`. `expandable` names the
- * properties that refer to another resource in one version's objects; other
- * paths are rejected like Stripe does, instead of being ignored.
+ * resource a property of an object (by its `object` type, if any) refers to in
+ * one version; other paths are rejected like Stripe does, instead of being
+ * ignored.
  */
 export async function expandPaths(
   value: unknown,
   paths: readonly string[],
-  expandable: Readonly<Record<string, Kind>>,
+  expandable: (owner: string | undefined, property: string) => Kind | undefined,
   resolve: Resolver,
   project: (record: ResourceRecord) => unknown,
 ): Promise<unknown> {
@@ -86,7 +87,8 @@ export async function expandPaths(
       return;
     }
 
-    const kind = Object.hasOwn(expandable, head) ? expandable[head] : undefined;
+    const owner = typeof record.object === 'string' ? record.object : undefined;
+    const kind = expandable(owner, head);
     const current = record[head];
 
     if (kind === undefined) {

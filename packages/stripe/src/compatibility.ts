@@ -1,47 +1,104 @@
 import { type CompatibilityManifest, defineCompatibility } from 'emulon';
 
-const version = '2026-04-22.dahlia';
+const dahlia = '2026-04-22.dahlia';
+const basil = '2025-03-31.basil';
 const auth = ['local-bearer-api-key'];
 
 type Operation = CompatibilityManifest['operations'][number];
+type Event = CompatibilityManifest['events'][number];
 
-function api(
-  id: string,
-  method: Operation['method'],
-  path: string,
-  input: string[],
-  output: string,
-  cases: string[],
-  events: string[] = [],
-): Operation {
-  return {
-    id,
-    method,
-    path,
-    surface: 'api',
-    version,
-    auth,
-    input,
-    output,
-    events,
-    cases,
-  };
+/** What one shipped version spells differently, and its verification. */
+interface Flavor {
+  version: string;
+  /** Case ID prefix, distinct per version. */
+  prefix: string;
+  client: string;
+  promotionInput: string[];
+  promotionOutput: string;
+  promotionExpand: string[];
+  managedPayments: string[];
+  suites: { path: string; cases: string[] }[];
 }
 
-const list = ['limit', 'starting_after', 'ending_before', 'expand[]'];
-const catalog = ['stripe.catalog.1'];
-const discounts = ['stripe.discounts.1'];
-const checkout = ['stripe.checkout.1'];
-const payments = ['stripe.payments.1'];
+const flavors: Flavor[] = [{
+  version: dahlia,
+  prefix: 'stripe',
+  client: 'stripe@22.1.1',
+  promotionInput: ['promotion[type]=coupon', 'promotion[coupon]'],
+  promotionOutput: 'PromotionCode with promotion { type, coupon }',
+  promotionExpand: ['expand[] (promotion.coupon)'],
+  managedPayments: ['managed_payments[enabled]'],
+  suites: [{
+    path: 'packages/stripe/tests/webhook_cases.ts',
+    cases: ['stripe.webhooks.1', 'stripe.webhooks.2'],
+  }, {
+    path: 'packages/stripe/tests/customers_test.ts',
+    cases: ['stripe.customers.1'],
+  }, {
+    path: 'packages/stripe/tests/billing_cases.ts',
+    cases: [
+      'stripe.catalog.1',
+      'stripe.discounts.1',
+      'stripe.checkout.1',
+      'stripe.payments.1',
+      'stripe.webhooks.3',
+    ],
+  }],
+}, {
+  version: basil,
+  prefix: 'stripe.basil',
+  client: 'stripe@18.0.0',
+  promotionInput: ['coupon'],
+  promotionOutput: 'PromotionCode with the whole Coupon as top-level coupon',
+  promotionExpand: ['expand[] (coupon is always embedded)'],
+  managedPayments: [],
+  suites: [{
+    path: 'packages/stripe/tests/basil_cases.ts',
+    cases: [
+      'stripe.basil.customers.1',
+      'stripe.basil.webhooks.1',
+      'stripe.basil.webhooks.2',
+      'stripe.basil.catalog.1',
+      'stripe.basil.discounts.1',
+      'stripe.basil.checkout.1',
+      'stripe.basil.payments.1',
+      'stripe.basil.webhooks.3',
+    ],
+  }],
+}];
 
-export const compatibility: CompatibilityManifest = defineCompatibility({
-  'schemaVersion': 1,
-  'plugin': '@emulon/stripe',
-  'provider': {
-    'name': 'Stripe',
-    'api': 'Customers, catalog, discounts, Checkout and payments',
-  },
-  'operations': [
+function operations(flavor: Flavor): Operation[] {
+  const { version } = flavor;
+  const list = ['limit', 'starting_after', 'ending_before', 'expand[]'];
+  const catalog = [`${flavor.prefix}.catalog.1`];
+  const discounts = [`${flavor.prefix}.discounts.1`];
+  const checkout = [`${flavor.prefix}.checkout.1`];
+  const payments = [`${flavor.prefix}.payments.1`];
+
+  function api(
+    id: string,
+    method: Operation['method'],
+    path: string,
+    input: string[],
+    output: string,
+    cases: string[],
+    events: string[] = [],
+  ): Operation {
+    return {
+      id,
+      method,
+      path,
+      surface: 'api',
+      version,
+      auth,
+      input,
+      output,
+      events,
+      cases,
+    };
+  }
+
+  return [
     api(
       'customers.create',
       'POST',
@@ -55,7 +112,7 @@ export const compatibility: CompatibilityManifest = defineCompatibility({
         'Idempotency-Key header',
       ],
       'Customer',
-      ['stripe.customers.1'],
+      [`${flavor.prefix}.customers.1`],
       ['customer.created'],
     ),
     api(
@@ -64,7 +121,7 @@ export const compatibility: CompatibilityManifest = defineCompatibility({
       '/v1/customers/:id',
       ['id'],
       'Customer',
-      ['stripe.customers.1'],
+      [`${flavor.prefix}.customers.1`],
     ),
     api(
       'products.create',
@@ -205,8 +262,7 @@ export const compatibility: CompatibilityManifest = defineCompatibility({
       'POST',
       '/v1/promotion_codes',
       [
-        'promotion[type]=coupon',
-        'promotion[coupon]',
+        ...flavor.promotionInput,
         'code',
         'active',
         'customer',
@@ -216,25 +272,25 @@ export const compatibility: CompatibilityManifest = defineCompatibility({
         'restrictions[minimum_amount]',
         'restrictions[minimum_amount_currency]',
         'metadata',
-        'expand[]',
+        ...flavor.promotionExpand,
       ],
-      'PromotionCode with promotion.coupon',
+      flavor.promotionOutput,
       discounts,
     ),
     api(
       'promotion_codes.get',
       'GET',
       '/v1/promotion_codes/:id',
-      ['id', 'expand[]'],
-      'PromotionCode',
+      ['id', ...flavor.promotionExpand],
+      flavor.promotionOutput,
       discounts,
     ),
     api(
       'promotion_codes.update',
       'POST',
       '/v1/promotion_codes/:id',
-      ['active', 'metadata', 'expand[]'],
-      'PromotionCode',
+      ['active', 'metadata', ...flavor.promotionExpand],
+      flavor.promotionOutput,
       discounts,
     ),
     api(
@@ -266,7 +322,7 @@ export const compatibility: CompatibilityManifest = defineCompatibility({
         'locale',
         'payment_method_types[]',
         'ui_mode=hosted',
-        'managed_payments[enabled]',
+        ...flavor.managedPayments,
         'metadata',
       ],
       'Checkout Session with a local hosted url',
@@ -370,165 +426,177 @@ export const compatibility: CompatibilityManifest = defineCompatibility({
       'Dispute',
       payments,
     ),
-  ],
-  'versions': [
+  ];
+}
+
+function events(flavor: Flavor): Event[] {
+  const { version } = flavor;
+  const checkout = [`${flavor.prefix}.checkout.1`];
+  const payments = [`${flavor.prefix}.payments.1`];
+
+  return [
     {
-      'id': version,
-      'accepted': [version],
-      'headers': ['stripe-version'],
-      'missing': 'Select the instance account default',
-      'unknown':
-        '400 invalid_request_error for unknown or disabled versions before mutation',
+      id: 'customer.created',
+      providerName: 'customer.created',
+      version,
+      projection: 'Event envelope with data.object Customer',
+      cases: [`${flavor.prefix}.customers.1`],
     },
-  ],
-  'authentication': {
-    'flows': [
-      'local-bearer-api-key',
-      'unguessable-session-url',
-      'form-token',
-    ],
-    'keyFormats': ['sk_test_ opaque key'],
-    'ownership':
+    {
+      id: 'checkout.session.completed',
+      providerName: 'checkout.session.completed',
+      version,
+      projection:
+        'Event envelope with data.object Checkout Session (payment_intent set when paid)',
+      cases: checkout,
+    },
+    {
+      id: 'checkout.session.expired',
+      providerName: 'checkout.session.expired',
+      version,
+      projection: 'Event envelope with data.object Checkout Session',
+      cases: checkout,
+    },
+    {
+      id: 'charge.refunded',
+      providerName: 'charge.refunded',
+      version,
+      projection:
+        'Event envelope with data.object Charge and previous_attributes amount_refunded, refunded',
+      cases: payments,
+    },
+    {
+      id: 'charge.dispute.created',
+      providerName: 'charge.dispute.created',
+      version,
+      projection: 'Event envelope with data.object Dispute',
+      cases: payments,
+    },
+    {
+      id: 'charge.dispute.closed',
+      providerName: 'charge.dispute.closed',
+      version,
+      projection:
+        'Event envelope with data.object Dispute and previous_attributes status',
+      cases: payments,
+    },
+  ];
+}
+
+const references = [
+  'customers/create',
+  'products',
+  'prices',
+  'coupons',
+  'promotion_codes',
+  'checkout/sessions',
+  'refunds',
+  'disputes',
+];
+
+export const compatibility: CompatibilityManifest = defineCompatibility({
+  schemaVersion: 2,
+  plugin: '@emulon/stripe',
+  provider: {
+    name: 'Stripe',
+    api: 'Customers, catalog, discounts, Checkout and payments',
+  },
+  operations: flavors.flatMap(operations),
+  versions: flavors.map(({ version }) => ({
+    id: version,
+    accepted: [version],
+    headers: ['stripe-version'],
+    missing:
+      'Select the instance account default (apiVersions and defaultApiVersion; dahlia without options)',
+    unknown:
+      '400 invalid_request_error for unknown or disabled versions before mutation',
+  })),
+  authentication: {
+    flows: ['local-bearer-api-key', 'unguessable-session-url', 'form-token'],
+    keyFormats: ['sk_test_ opaque key'],
+    ownership:
       'One local account per instance; reset invalidates keys, sessions and page tokens.',
-    'unsupported': [
+    unsupported: [
       'HTTP Basic',
       'Live keys',
       'Real Stripe accounts',
       'Publishable keys',
     ],
   },
-  'events': [
-    {
-      'id': 'customer.created',
-      'providerName': 'customer.created',
-      'version': version,
-      'projection': 'Event envelope with data.object Customer',
-      'cases': ['stripe.customers.1'],
-    },
-    {
-      'id': 'checkout.session.completed',
-      'providerName': 'checkout.session.completed',
-      'version': version,
-      'projection':
-        'Event envelope with data.object Checkout Session (payment_intent set when paid)',
-      'cases': checkout,
-    },
-    {
-      'id': 'checkout.session.expired',
-      'providerName': 'checkout.session.expired',
-      'version': version,
-      'projection': 'Event envelope with data.object Checkout Session',
-      'cases': checkout,
-    },
-    {
-      'id': 'charge.refunded',
-      'providerName': 'charge.refunded',
-      'version': version,
-      'projection':
-        'Event envelope with data.object Charge and previous_attributes amount_refunded, refunded',
-      'cases': payments,
-    },
-    {
-      'id': 'charge.dispute.created',
-      'providerName': 'charge.dispute.created',
-      'version': version,
-      'projection': 'Event envelope with data.object Dispute',
-      'cases': payments,
-    },
-    {
-      'id': 'charge.dispute.closed',
-      'providerName': 'charge.dispute.closed',
-      'version': version,
-      'projection':
-        'Event envelope with data.object Dispute and previous_attributes status',
-      'cases': payments,
-    },
-  ],
-  'webhooks': {
-    'signing':
+  events: flavors.flatMap(events),
+  webhooks: flavors.map(({ version, prefix }) => ({
+    version,
+    signing:
       'Stripe-Signature: t=Unix seconds,v1=HMAC-SHA256 hex; literal UTF-8 secret',
-    'id': 'Stable evt_ ID in the event envelope across retries and redelivery',
-    'body': 'Exact serialized event snapshot bytes retained across attempts',
-    'success': 'Any 2xx response',
-    'retries':
+    id: 'Stable evt_ ID in the event envelope across retries and redelivery',
+    body:
+      "Exact event snapshot bytes in the endpoint's pinned version, retained across attempts",
+    success: 'Any 2xx response',
+    retries:
       'Local sandbox approximation: 60s, 1h, 2h after failures; four attempts total; stop on success or disabled destination',
-    'redelivery':
+    redelivery:
       'Manual after terminal state; unavailable while queued or in-flight',
-    'recovery':
+    recovery:
       'Interrupted in-flight sends become failed/unknown and require manual redelivery; queued retries resume on restart',
-    'timeoutMs': 5000,
-    'cases': ['stripe.webhooks.1', 'stripe.webhooks.2', 'stripe.webhooks.3'],
-  },
-  'capabilities': [
-    'http',
-    'authorization',
-    'events',
-    'webhooks',
-    'reset',
-  ],
-  'limitations': [
+    timeoutMs: 5000,
+    cases: [
+      `${prefix}.webhooks.1`,
+      `${prefix}.webhooks.2`,
+      `${prefix}.webhooks.3`,
+    ],
+  })),
+  capabilities: ['http', 'authorization', 'events', 'webhooks', 'reset'],
+  limitations: [
     {
-      'id': 'stripe.resources',
-      'description':
+      id: 'stripe.versions',
+      description:
+        'Ships 2026-04-22.dahlia and 2025-03-31.basil; apiVersions selects which an instance serves. Only the differences inside the implemented slice are modeled: basil embeds the whole coupon in a promotion code and has no managed_payments. A promotion code whose coupon was deleted shows basil a deleted coupon stub.',
+    },
+    {
+      id: 'stripe.resources',
+      description:
         'Implemented: customers (create, retrieve), products, one-time prices, coupons, promotion codes, payment-mode hosted Checkout, payment intents and charges as Checkout produces them, refunds and disputes. Not implemented: subscriptions, invoices, recurring prices, price_data, embedded Checkout, Payment Element, Connect, test clocks, search and customer lists.',
     },
     {
-      'id': 'stripe.checkout',
-      'description':
-        'Payment happens on the local hosted page or through checkout.sessions.complete; every payment succeeds. No card numbers, 3DS, declines, taxes, shipping, adaptive pricing or Managed Payments behavior: managed_payments is accepted and ignored. customer_creation defaults to if_required, so payment mode creates no Customer.',
+      id: 'stripe.checkout',
+      description:
+        'Payment happens on the local hosted page or through checkout.sessions.complete; every payment succeeds. No card numbers, 3DS, declines, taxes, shipping, adaptive pricing or Managed Payments behavior: dahlia accepts and ignores managed_payments. customer_creation defaults to if_required, so payment mode creates no Customer.',
     },
     {
-      'id': 'stripe.disputes',
-      'description':
+      id: 'stripe.disputes',
+      description:
         'Disputes are opened and closed through control commands, standing in for the card network. No evidence submission, withdrawals or balance transactions.',
     },
     {
-      'id': 'stripe.events',
-      'description':
+      id: 'stripe.events',
+      description:
         'Only the six declared event types are recorded; for example payment_intent.succeeded, charge.succeeded and refund.created are not.',
     },
     {
-      'id': 'stripe.idempotency',
-      'description':
-        'Every POST honors Idempotency-Key. Concurrent same-key requests serialize and replay; only committed results are cached. Infrastructure failures roll back instead of caching 500s. Lazy expiry after 24 hours.',
+      id: 'stripe.idempotency',
+      description:
+        'Every POST honors Idempotency-Key. Concurrent same-key requests serialize and replay; only committed results are cached. Infrastructure failures roll back instead of caching 500s. Lazy expiry after 24 hours. A key is bound to the API version of its first request.',
     },
     {
-      'id': 'stripe.webhooks',
-      'description':
+      id: 'stripe.webhooks',
+      description:
         'Retry timing is a local approximation, not the exact Stripe schedule. No ordering guarantee, automatic recovery of interrupted sends, public virtual time or manual resend while an automatic retry is queued.',
     },
   ],
-  'verification': {
-    'mode': 'official-client',
-    'client': 'stripe@22.1.1',
-    'suites': [{
-      'path': 'packages/stripe/tests/webhook_cases.ts',
-      'cases': ['stripe.webhooks.1', 'stripe.webhooks.2'],
-    }, {
-      'path': 'packages/stripe/tests/customers_test.ts',
-      'cases': ['stripe.customers.1'],
-    }, {
-      'path': 'packages/stripe/tests/billing_cases.ts',
-      'cases': [
-        'stripe.catalog.1',
-        'stripe.discounts.1',
-        'stripe.checkout.1',
-        'stripe.payments.1',
-        'stripe.webhooks.3',
+  verification: {
+    byVersion: flavors.map(({ version, client, suites }) => ({
+      version,
+      mode: 'official-client',
+      client,
+      suites,
+      sources: [
+        `https://www.npmjs.com/package/stripe/v/${client.split('@')[1]}`,
+        ...references.map((path) =>
+          `https://docs.stripe.com/api/${path}?api-version=${version}`
+        ),
       ],
-    }],
-    'sources': [
-      'https://www.npmjs.com/package/stripe/v/22.1.1',
-      'https://docs.stripe.com/api/customers/create?api-version=2026-04-22.dahlia',
-      'https://docs.stripe.com/api/products?api-version=2026-04-22.dahlia',
-      'https://docs.stripe.com/api/prices?api-version=2026-04-22.dahlia',
-      'https://docs.stripe.com/api/coupons?api-version=2026-04-22.dahlia',
-      'https://docs.stripe.com/api/promotion_codes?api-version=2026-04-22.dahlia',
-      'https://docs.stripe.com/api/checkout/sessions?api-version=2026-04-22.dahlia',
-      'https://docs.stripe.com/api/refunds?api-version=2026-04-22.dahlia',
-      'https://docs.stripe.com/api/disputes?api-version=2026-04-22.dahlia',
-    ],
-    'retrieved': '2026-09-23',
-    'liveProviderCompared': false,
+      retrieved: '2026-09-24',
+      liveProviderCompared: false,
+    })),
   },
 });

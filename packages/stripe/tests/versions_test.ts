@@ -60,8 +60,8 @@ function marked<T>(value: T): T {
 }
 
 /**
- * Dahlia under another ID, marking what it projects. It stands in for a second
- * shipped module; the package ships only dahlia.
+ * Dahlia under another ID, marking what it projects: every projection differs
+ * from dahlia's, so a leak between versions is visible.
  */
 const test: StripeVersionModule = {
   ...dahlia,

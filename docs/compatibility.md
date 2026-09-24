@@ -34,11 +34,13 @@ Third-party plugins may omit the declaration.
 
 ## Schema versions
 
-Every current official declaration uses `schemaVersion: 1`: operation and event
-IDs are unique, one `webhooks` object describes delivery, and one `verification`
-record names the client pin and suites. `schemaVersion: 2` serves plugins that
-ship several provider API versions side by side
-([ADR 0036](decisions/0036-stripe-api-version-modules.md)):
+`schemaVersion: 1` declares one provider API version: operation and event IDs
+are unique, one `webhooks` object describes delivery, and one `verification`
+record names the client pin and suites. The GitHub, Resend, Cal.com and Polar
+declarations use it. `schemaVersion: 2` serves plugins that ship several
+provider API versions side by side
+([ADR 0036](decisions/0036-stripe-api-version-modules.md)); Stripe uses it for
+`2026-04-22.dahlia` (`stripe@22.1.1`) and `2025-03-31.basil` (`stripe@18.0.0`):
 
 - operation and event claims are unique by `(id, version)`, and `webhooks` is a
   list with at most one claim per version;
@@ -60,14 +62,16 @@ versions; the instance options decide which ones are enabled.
 
 GitHub and Resend use `tests/compatibility_test.ts` to import executable case
 registries from `*_cases.ts`; Stripe registers and runs its provider contract in
-`tests/customers_test.ts`, and Polar does the same for its customer, webhook and
-parity registries. Cases retain the original assertions for provider requests,
-response projections, errors, authorization, events and signatures. The runner
-checks equality of declared and registered case IDs, suite paths, and the
-operation/event/webhook coverage of each case, then executes every registered
-case. In a version-2 manifest, a case covers claims only of the version whose
-suite registers it. A mutation test adds an operation using an existing case ID
-and proves that coverage validation rejects it.
+`tests/customers_test.ts`, once per version: the dahlia suites and
+`tests/basil_cases.ts`, which runs the same suites through `stripe@18.0.0` with
+distinct `stripe.basil.*` case IDs. Polar does the same for its customer,
+webhook and parity registries. Cases retain the original assertions for provider
+requests, response projections, errors, authorization, events and signatures.
+The runner checks equality of declared and registered case IDs, suite paths, and
+the operation/event/webhook coverage of each case, then executes every
+registered case. In a version-2 manifest, a case covers claims only of the
+version whose suite registers it. A mutation test adds an operation using an
+existing case ID and proves that coverage validation rejects it.
 
 `deno task check` runs these suites, the schema/command tests, npm builds and
 isolated offline Node/Deno installations. Installed consumers compare source,

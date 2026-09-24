@@ -64,10 +64,14 @@ for (const test of cases) {
 }
 
 Deno.test('existing version-1 manifests remain valid unchanged', () => {
-  for (const manifest of [calcom, github, polar, resend, stripe]) {
+  for (const manifest of [calcom, github, polar, resend]) {
     equal(manifest.schemaVersion, 1, manifest.plugin);
     equal(defineCompatibility(structuredClone(manifest)), manifest);
   }
+
+  // Stripe ships two API versions and declares them with version 2.
+  equal(stripe.schemaVersion, 2, stripe.plugin);
+  equal(defineCompatibility(structuredClone(stripe)), stripe);
 });
 
 Deno.test('version-2 manifest keys claims by (id, version) and verifies each version', () => {

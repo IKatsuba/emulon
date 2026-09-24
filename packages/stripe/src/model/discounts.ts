@@ -59,7 +59,14 @@ export interface PromotionCode {
   times_redeemed: number;
 }
 
-export type PromotionCodeView = PromotionCode & { active: boolean };
+/**
+ * A promotion code as read, with the current view of its coupon for versions
+ * that embed it; `null` once the coupon is deleted.
+ */
+export type PromotionCodeView = PromotionCode & {
+  active: boolean;
+  coupon_view: CouponView | null;
+};
 
 export interface CouponInput {
   id?: string | undefined;
@@ -147,7 +154,11 @@ export async function viewPromotionCode(
 ): Promise<PromotionCodeView> {
   const coupon = await find<Coupon>(tx, 'coupon', code.coupon);
 
-  return { ...code, active: promotionActive(code, coupon, now) };
+  return {
+    ...code,
+    active: promotionActive(code, coupon, now),
+    coupon_view: coupon ? viewCoupon(coupon, now) : null,
+  };
 }
 
 export async function createCoupon(

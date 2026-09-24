@@ -4,14 +4,14 @@ import type { EventFact, ResourceRecord } from '../../model/core.ts';
 import { disputeReasons } from '../../model/payments.ts';
 import { eventObjects, eventTypes } from '../../webhooks/mod.ts';
 import type { StripeEvent } from '../types.ts';
-import { projectRecord } from './project.ts';
+import { projectEventObject } from './project.ts';
 
 const nullable = z.string().nullable();
 const metadata = z.record(z.string(), z.string());
 const created = z.number().int().nonnegative();
 
 /**
- * The resources events carry, as dahlia shows them. Parsing keeps the
+ * The resources events carry, the same in every shipped version. Parsing keeps the
  * semantic fields a record holds and drops what the projection derives.
  */
 const objects: Record<string, z.ZodType<ResourceRecord>> = {
@@ -123,7 +123,7 @@ export function projectEvent(
     api_version: version,
     created: fact.created,
     data: {
-      object: projectRecord(fact.object),
+      object: projectEventObject(fact.object),
       ...(fact.previous
         ? { previous_attributes: structuredClone(fact.previous) }
         : {}),

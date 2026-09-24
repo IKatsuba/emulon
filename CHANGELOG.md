@@ -20,7 +20,8 @@ project adheres to [Semantic Versioning](https://semver.org/).
   Stripe API versions an instance serves; `Stripe-Version` picks one per request
   and the account default applies without it. Webhook endpoints pin an
   `apiVersion`, shown by `webhooks destinations`, and commands that return
-  Stripe objects accept `apiVersion` (`--api-version`).
+  Stripe objects accept `apiVersion` (`--api-version`). The compatibility
+  manifest uses schema version 2 with coverage for each version.
 - `emulon`: optional `PluginDefinition.presentation` hooks. `eventView` shapes
   the payload shown by event list and follow; `deliverySnapshot` captures the
   exact webhook body when a delivery is enqueued, and retries, redelivery and
@@ -29,9 +30,10 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
-- `@emulon/stripe` serves Stripe API `2026-04-22.dahlia` instead of
-  `2025-03-31.basil` and is verified with `stripe@22.1.1`. Customers carry the
-  full object and accept `metadata` and `phone`.
+- `@emulon/stripe` serves Stripe API `2026-04-22.dahlia` by default, verified
+  with `stripe@22.1.1`, and also ships `2025-03-31.basil`, verified with
+  `stripe@18.0.0`; `apiVersions` enables both at once. Customers carry the full
+  object and accept `metadata` and `phone`.
 - `@emulon/stripe` exposes a second `web` endpoint and stores state in schema
   version 3, holding resources and events independently of an API version; state
   saved by earlier versions must be reset. Unknown and disabled `Stripe-Version`

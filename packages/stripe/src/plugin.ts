@@ -28,7 +28,7 @@ import {
 } from './webhooks/mod.ts';
 
 /** Stripe API versions this package ships. */
-export type ApiVersion = '2026-04-22.dahlia';
+export type ApiVersion = '2026-04-22.dahlia' | '2025-03-31.basil';
 
 export type Options = {
   /** Versions this instance serves; only the baseline without it. */

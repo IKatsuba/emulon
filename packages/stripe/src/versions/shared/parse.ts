@@ -73,7 +73,14 @@ export function readCustomer(fields: Fields): CustomerInput {
   return input;
 }
 
-function readSession(fields: Fields): SessionInput {
+/**
+ * `managed_payments` exists only in versions that know Stripe-managed
+ * payments; elsewhere it is an unknown parameter.
+ */
+export function readSession(
+  fields: Fields,
+  { managedPayments }: { managedPayments: boolean },
+): SessionInput {
   const mode = fields.oneOf('mode', ['payment', 'setup', 'subscription']);
   const lines = fields.list('line_items');
   const customer = fields.string('customer');
@@ -91,7 +98,9 @@ function readSession(fields: Fields): SessionInput {
   const locale = fields.string('locale');
   const paymentMethodTypes = fields.strings('payment_method_types');
   const uiMode = fields.oneOf('ui_mode', ['hosted', 'embedded', 'custom']);
-  const managed = fields.object('managed_payments');
+  const managed = managedPayments
+    ? fields.object('managed_payments')
+    : undefined;
   const metadata = fields.metadata() ?? {};
 
   // Accepted for Stripe-managed payments integrations and otherwise ignored.
@@ -232,9 +241,13 @@ function readDiscount(
   return promotionCode !== undefined ? { promotionCode } : { coupon: coupon! };
 }
 
-const parsers: {
-  [Op in OperationId]: (fields: Fields) => Inputs[Op];
-} = {
+type Parser<Op extends OperationId> = (fields: Fields) => Inputs[Op];
+
+/** Operations whose parameters differ between shipped versions. */
+type Versioned = 'promotion_codes.create' | 'checkout.sessions.create';
+
+/** Parsers of operations every shipped version accepts the same way. */
+const shared: { [Op in Exclude<OperationId, Versioned>]: Parser<Op> } = {
   'customers.create': readCustomer,
   'customers.get': none,
   'products.create': (fields) => {
@@ -462,73 +475,6 @@ const parsers: {
   },
   'coupons.get': none,
   'coupons.delete': none,
-  'promotion_codes.create': (fields) => {
-    // Dahlia nests the discount: `promotion[type]=coupon&promotion[coupon]=`.
-    const promotion = fields.object('promotion');
-
-    if (promotion === undefined) {
-      throw invalidRequest(
-        'Missing required param: promotion.',
-        'promotion',
-        'parameter_missing',
-      );
-    }
-
-    if (promotion.oneOf('type', ['coupon']) === undefined) {
-      throw invalidRequest(
-        'Missing required param: promotion[type].',
-        'promotion[type]',
-        'parameter_missing',
-      );
-    }
-
-    const coupon = promotion.required('coupon');
-    const code = fields.string('code', { max: 500 });
-    const expiresAt = fields.int('expires_at', { min: 0 });
-    const customer = fields.string('customer');
-    const restrictions = fields.object('restrictions');
-    const minimumAmount = restrictions?.int('minimum_amount', { min: 1 });
-    const minimumAmountCurrency = restrictions?.string(
-      'minimum_amount_currency',
-    );
-    const active = fields.bool('active');
-    const maxRedemptions = fields.int('max_redemptions', { min: 1 });
-    const metadata = fields.metadata();
-    const firstTimeTransaction = restrictions?.bool('first_time_transaction');
-
-    promotion.done();
-    restrictions?.done();
-    fields.done();
-
-    if (code !== undefined && !codeFormat.test(code)) {
-      throw invalidRequest(
-        'Promotion codes may contain only letters, digits, - and _.',
-        'code',
-      );
-    }
-
-    if (
-      (minimumAmount === undefined) !== (minimumAmountCurrency === undefined)
-    ) {
-      throw invalidRequest(
-        'minimum_amount and minimum_amount_currency must be passed together.',
-        'restrictions',
-      );
-    }
-
-    return {
-      coupon,
-      code,
-      active,
-      customer,
-      expiresAt,
-      maxRedemptions,
-      metadata,
-      firstTimeTransaction,
-      minimumAmount,
-      minimumAmountCurrency: minimumAmountCurrency?.toLowerCase(),
-    };
-  },
   'promotion_codes.get': none,
   'promotion_codes.update': (fields) => {
     const input = {
@@ -553,7 +499,6 @@ const parsers: {
 
     return input;
   },
-  'checkout.sessions.create': readSession,
   'checkout.sessions.get': none,
   'checkout.sessions.list': (fields) => {
     const input = {
@@ -598,12 +543,75 @@ const parsers: {
   'disputes.get': none,
 };
 
-export function parse<Op extends OperationId>(
+/**
+ * The rest of a promotion code once a version has read which coupon it
+ * discounts with, in whatever shape that version names it.
+ */
+export function readPromotionCode(
+  fields: Fields,
+  coupon: string,
+): Inputs['promotion_codes.create'] {
+  const code = fields.string('code', { max: 500 });
+  const expiresAt = fields.int('expires_at', { min: 0 });
+  const customer = fields.string('customer');
+  const restrictions = fields.object('restrictions');
+  const minimumAmount = restrictions?.int('minimum_amount', { min: 1 });
+  const minimumAmountCurrency = restrictions?.string(
+    'minimum_amount_currency',
+  );
+  const active = fields.bool('active');
+  const maxRedemptions = fields.int('max_redemptions', { min: 1 });
+  const metadata = fields.metadata();
+  const firstTimeTransaction = restrictions?.bool('first_time_transaction');
+
+  restrictions?.done();
+  fields.done();
+
+  if (code !== undefined && !codeFormat.test(code)) {
+    throw invalidRequest(
+      'Promotion codes may contain only letters, digits, - and _.',
+      'code',
+    );
+  }
+
+  if (
+    (minimumAmount === undefined) !== (minimumAmountCurrency === undefined)
+  ) {
+    throw invalidRequest(
+      'minimum_amount and minimum_amount_currency must be passed together.',
+      'restrictions',
+    );
+  }
+
+  return {
+    coupon,
+    code,
+    active,
+    customer,
+    expiresAt,
+    maxRedemptions,
+    metadata,
+    firstTimeTransaction,
+    minimumAmount,
+    minimumAmountCurrency: minimumAmountCurrency?.toLowerCase(),
+  };
+}
+
+/** A version's parser: the shared operations plus its own. */
+export function parser(
+  own: { [Op in Versioned]: Parser<Op> },
+): <Op extends OperationId>(
   operation: Op,
   params: Params,
-): Parsed<Inputs[Op]> {
-  const fields = new Fields(params);
-  const expand = readExpand(fields);
+) => Parsed<Inputs[Op]> {
+  const parsers = { ...shared, ...own } as {
+    [Op in OperationId]: Parser<Op>;
+  };
 
-  return { input: parsers[operation](fields), expand };
+  return (operation, params) => {
+    const fields = new Fields(params);
+    const expand = readExpand(fields);
+
+    return { input: parsers[operation](fields), expand };
+  };
 }

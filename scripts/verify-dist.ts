@@ -547,6 +547,21 @@ try {
   const manifest = await stripeEnv.services.stripe.compatibility.get({});
   assert(manifest.capabilities.includes("webhooks"), "Stripe webhooks missing");
 } finally { await stripeEnv.dispose(); }
+const versionedStripe = await Emulon.start({ services: { stripe: stripe({ apiVersions: ["2026-04-22.dahlia", "2025-03-31.basil"] }) } });
+try {
+  const { apiKey } = await versionedStripe.services.stripe.keys.create({});
+  const call = async (path, version, body) => {
+    const response = await fetch(versionedStripe.endpoints.stripe.api + path, { method: body === undefined ? "GET" : "POST", headers: { authorization: "Bearer " + apiKey, "content-type": "application/x-www-form-urlencoded", "stripe-version": version }, body });
+    return { status: response.status, version: response.headers.get("stripe-version"), value: await response.json() };
+  };
+  const coupon = await call("/v1/coupons", "2025-03-31.basil", "percent_off=10");
+  const basil = await call("/v1/promotion_codes", "2025-03-31.basil", "coupon=" + coupon.value.id);
+  assert(basil.status === 200 && basil.version === "2025-03-31.basil" && basil.value.coupon.id === coupon.value.id && basil.value.promotion === undefined, "Stripe basil promotion code failed");
+  const dahlia = await call("/v1/promotion_codes/" + basil.value.id, "2026-04-22.dahlia");
+  assert(dahlia.value.promotion.coupon === coupon.value.id && dahlia.value.coupon === undefined, "Stripe dahlia read of a basil code failed");
+  assert((await call("/v1/promotion_codes", "2026-04-22.dahlia", "coupon=" + coupon.value.id)).status === 400, "Stripe dahlia accepted the basil shape");
+  assert((await call("/v1/promotion_codes", "2025-03-31.basil", "promotion[type]=coupon&promotion[coupon]=" + coupon.value.id)).status === 400, "Stripe basil accepted the dahlia shape");
+} finally { await versionedStripe.dispose(); }
 const githubEnv = await Emulon.start({ services: { github: github({ fixtures: { users: [{ login: "igor" }], repositories: [{ owner: "igor", name: "demo" }] } }) } });
 try {
   const app = await githubEnv.services.github.apps.create({ slug: "review-bot" });

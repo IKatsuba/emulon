@@ -1,6 +1,7 @@
 import ts from 'typescript';
 import { compatibility as github } from '../packages/github/src/compatibility.ts';
 import { compatibility as mail } from '../packages/resend/src/compatibility.ts';
+import { compatibility as stripe } from '../packages/stripe/src/compatibility.ts';
 import { compatibility as versioned } from '../packages/emulon/tests/fixtures/versioned.ts';
 
 /**
@@ -48,15 +49,16 @@ import { readFile, mkdir } from "node:fs/promises";
 import { Emulon, defineCompatibility } from "${prefix}emulon";
 import github from "${prefix}@emulon/github";
 import resend from "${prefix}@emulon/resend";
+import stripe from "${prefix}@emulon/stripe";
 import versioned from "./node_modules/@emulon-fixture/versioned/mod.mjs";
 import { serveEnvironment } from "./node_modules/emulon/esm/control/server.js";
 import { runProjectCLI } from "./node_modules/emulon/esm/cli/project.js";
 import { listen } from "./node_modules/emulon/esm/runtime/http.js";
 import { createHmac } from "node:crypto";
-const expected = ${JSON.stringify({ github, mail, versioned })};
+const expected = ${JSON.stringify({ github, mail, stripe, versioned })};
 const directory = "./compatibility-project";
 await mkdir(directory);
-const config = { services: { github: github(), mail: resend(), versioned: versioned() } };
+const config = { services: { github: github(), mail: resend(), stripe: stripe({ apiVersions: ["2026-04-22.dahlia", "2025-03-31.basil"] }), versioned: versioned() } };
 const started = await Emulon.start(config);
 const host = await serveEnvironment(config, { directory });
 let connected;
@@ -67,7 +69,8 @@ try {
   connected = await Emulon.connect({ config, directory });
   const key = await connected.services.mail.keys.create();
   const app = await connected.services.github.apps.create({ slug: "private-options-canary" });
-  for (const [instance, packageName] of [["github", "@emulon/github"], ["mail", "@emulon/resend"], ["versioned", "@emulon-fixture/versioned"]]) {
+  const stripeKey = await connected.services.stripe.keys.create({});
+  for (const [instance, packageName] of [["github", "@emulon/github"], ["mail", "@emulon/resend"], ["stripe", "@emulon/stripe"], ["versioned", "@emulon-fixture/versioned"]]) {
     const pkg = JSON.parse(await readFile("./node_modules/" + packageName + "/package.json", "utf8"));
     const manifest = defineCompatibility(pkg.emulon.compatibility);
     equal(manifest, expected[instance], "source/npm");
@@ -76,14 +79,16 @@ try {
     const cli = await runProjectCLI([instance, "compatibility", "get", "--json"], undefined, directory);
     if (cli.code !== 0) throw new Error("Compatibility CLI failed");
     equal(JSON.parse(cli.stdout), manifest, "CLI/npm");
-    for (const secret of [key.apiKey, app.clientSecret, app.privateKey, "private-options-canary"]) {
+    for (const secret of [key.apiKey, app.clientSecret, app.privateKey, stripeKey.apiKey, "private-options-canary"]) {
       if (cli.stdout.includes(secret)) throw new Error("Compatibility leaked instance data");
     }
   }
   await connected.reset();
   const v2 = await connected.services.versioned.compatibility.get({});
   equal(v2.verification.byVersion.map(entry => [entry.version, entry.client]), [["2025-01-01.alpha", "versioned@1.0.0"], ["2026-01-01.beta", "versioned@2.0.0"]], "version-2 pins");
-  for (const instance of ["github", "mail", "versioned"]) equal(await connected.services[instance].compatibility.get({}), expected[instance], "reset");
+  const pins = await connected.services.stripe.compatibility.get({});
+  equal(pins.verification.byVersion.map(entry => [entry.version, entry.client]), [["2026-04-22.dahlia", "stripe@22.1.1"], ["2025-03-31.basil", "stripe@18.0.0"]], "Stripe version pins");
+  for (const instance of ["github", "mail", "stripe", "versioned"]) equal(await connected.services[instance].compatibility.get({}), expected[instance], "reset");
   // The installed fixture behaves as its manifest claims, not only declares it.
   const received = [];
   const receiver = await listen(async (request) => {
@@ -109,6 +114,6 @@ try {
   await host.dispose();
   await started.dispose();
 }
-console.log("GitHub/Resend/version-2 fixture source = npm metadata = CLI = started/connected SDK; reset and credential isolation; version-2 fixture events and signed endpoint snapshots");
+console.log("GitHub/Resend/Stripe/version-2 fixture source = npm metadata = CLI = started/connected SDK; reset and credential isolation; version-2 fixture events and signed endpoint snapshots");
 `;
 }

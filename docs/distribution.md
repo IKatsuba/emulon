@@ -157,16 +157,20 @@ manager selection, the conservative edit grammar, failure behavior and
 package-manager boundaries. npm archive installation remains offline; only the
 `add` acceptance fixture enables registry requests to its loopback server.
 
-The installed compatibility proof compares the GitHub and Resend declarations
-with npm metadata, CLI and started/connected SDK results under both runtimes.
-The build imports static [compatibility declarations](compatibility.md) without
-calling plugin setup or opening provider listeners.
+The installed compatibility proof compares the GitHub, Resend and Stripe
+declarations with npm metadata, CLI and started/connected SDK results under both
+runtimes, including Stripe's per-version official client pins. The build imports
+static [compatibility declarations](compatibility.md) without calling plugin
+setup or opening provider listeners.
 
 The installed Stripe slice creates and reads customers through HTTP and the
-typed SDK. CLI idempotency replay survives graceful shutdown and SIGKILL under
-both runtimes. The official stripe@22.1.1 client is packed separately for
-offline consumer testing and excluded from published product dependencies. The
-combined example below also verifies signed Stripe delivery.
+typed SDK, and an instance serving both API versions takes each version's
+promotion code shape, rejects the other's and reads one state through both. CLI
+idempotency replay survives graceful shutdown and SIGKILL under both runtimes.
+The official stripe@22.1.1 client is packed separately for offline consumer
+testing and excluded from published product dependencies; stripe@18.0.0 is a
+development-only alias used by the basil suite. The combined example below also
+verifies signed Stripe delivery.
 
 ## Cal.com fixed availability slice
 

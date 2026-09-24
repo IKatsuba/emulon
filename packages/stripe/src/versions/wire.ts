@@ -1,13 +1,16 @@
 // Stripe API fields are snake_case on the wire.
 // deno-lint-ignore-file camelcase
-import type { Metadata } from '../../model/core.ts';
+import type { Metadata } from '../model/core.ts';
 import type {
   ClosedStatus,
   DisputeReason,
   RefundReason,
-} from '../../model/payments.ts';
+} from '../model/payments.ts';
 
-/** The dahlia objects control commands return, as the SDK types them. */
+/**
+ * The objects control commands return, as the SDK types them. Every shipped
+ * version shows these the same way.
+ */
 
 export interface Customer {
   id: string;
