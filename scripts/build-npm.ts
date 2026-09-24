@@ -115,14 +115,6 @@ for (
 
   delete manifest.devDependencies;
 
-  if (core) {
-    // Plugins take Hono as a peer range; an exact core pin would make npm
-    // install a second, newer copy for them whose types no longer match.
-    manifest.dependencies.hono = JSON.parse(
-      await Deno.readTextFile('packages/github/deno.json'),
-    ).peerDependencies.hono;
-  }
-
   delete manifest.scripts;
   delete manifest.exports['./internal-state'];
 

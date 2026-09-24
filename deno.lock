@@ -2,8 +2,7 @@
   "version": "5",
   "specifiers": {
     "jsr:@david/code-block-writer@^13.0.3": "13.0.3",
-    "jsr:@deno/dnt@*": "0.43.2",
-    "jsr:@deno/dnt@~0.43.2": "0.43.2",
+    "jsr:@deno/dnt@0.43.2": "0.43.2",
     "jsr:@std/fmt@1": "1.0.10",
     "jsr:@std/fs@1": "1.0.24",
     "jsr:@std/internal@^1.0.14": "1.0.14",
@@ -13,14 +12,14 @@
     "jsr:@ts-morph/common@0.29": "0.29.0",
     "npm:@hono/node-server@2.0.12": "2.0.12_hono@4.13.8",
     "npm:@polar-sh/sdk@0.49.0": "0.49.0",
-    "npm:@types/node@^22.20.4": "22.20.4",
+    "npm:@types/node@22.20.4": "22.20.4",
     "npm:hono@4.13.8": "4.13.8",
     "npm:octokit@5.0.5": "5.0.5",
     "npm:resend@6.28.1": "6.28.1",
     "npm:stripe@22.1.1": "22.1.1_@types+node@22.20.4",
     "npm:stripe@22.6.2": "22.6.2_@types+node@22.20.4",
     "npm:typescript@5.9.3": "5.9.3",
-    "npm:zod@4": "4.6.5"
+    "npm:zod@4.6.5": "4.6.5"
   },
   "jsr": {
     "@david/code-block-writer@13.0.3": {
@@ -404,16 +403,16 @@
   },
   "workspace": {
     "dependencies": [
-      "jsr:@deno/dnt@~0.43.2",
+      "jsr:@deno/dnt@0.43.2",
       "npm:@hono/node-server@2.0.12",
       "npm:@polar-sh/sdk@0.49.0",
-      "npm:@types/node@^22.20.4",
+      "npm:@types/node@22.20.4",
       "npm:hono@4.13.8",
       "npm:octokit@5.0.5",
       "npm:resend@6.28.1",
       "npm:stripe@22.1.1",
       "npm:typescript@5.9.3",
-      "npm:zod@4"
+      "npm:zod@4.6.5"
     ]
   }
 }

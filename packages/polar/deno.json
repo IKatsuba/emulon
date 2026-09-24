@@ -13,7 +13,7 @@
     ]
   },
   "peerDependencies": {
-    "emulon": "^0.1.2",
-    "hono": "^4.13.8"
+    "emulon": "0.1.2",
+    "hono": "4.13.8"
   }
 }

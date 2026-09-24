@@ -38,7 +38,7 @@ async function bump(version: string): Promise<void> {
     config.version = version;
 
     if (config.peerDependencies?.emulon) {
-      config.peerDependencies.emulon = `^${version}`;
+      config.peerDependencies.emulon = version;
     }
 
     await Deno.writeTextFile(path, JSON.stringify(config, null, 2) + '\n');
@@ -96,7 +96,7 @@ async function verify(tag: string): Promise<void> {
 
     if (
       config.peerDependencies?.emulon &&
-      config.peerDependencies.emulon !== `^${version}`
+      config.peerDependencies.emulon !== version
     ) {
       mismatches.push(
         `${config.name} peer emulon@${config.peerDependencies.emulon}`,

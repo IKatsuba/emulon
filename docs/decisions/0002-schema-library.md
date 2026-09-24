@@ -14,9 +14,10 @@ types, a JSON wire representation, and JSON Schema metadata for CLI tooling.
 
 ## Decision
 
-Use `npm:zod@^4`, declared as `zod` in the root `deno.json` imports. Command
-schemas will define inputs and outputs with explicit JSON representations and
-use Zod's built-in JSON Schema generation for CLI metadata.
+Use Zod 4 at an exact version (`npm:zod@4.6.5`), declared as `zod` in the root
+`deno.json` imports. Command schemas will define inputs and outputs with
+explicit JSON representations and use Zod's built-in JSON Schema generation for
+CLI metadata.
 
 ## Consequences
 

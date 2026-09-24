@@ -16,9 +16,9 @@ multiple-cookie fixes.
 
 Use `hono@4.13.8` and `@hono/node-server@2.0.12`, pinned in the Deno import map
 and lockfile. Core has runtime dependencies; plugins declare `hono` as a peer
-alongside `emulon`. The published core declares `hono` with the same range as
-the plugin peer, not the exact development pin, so npm resolves one copy for the
-core and its plugins; an exact pin gives plugins a second, newer patch whose
+alongside `emulon`. The published core and every plugin name the same exact
+`hono` version, the core as a dependency and plugins as a peer, so npm resolves
+one copy; a range on either side lets a newer patch in as a second copy whose
 types do not match. The build packs both dependencies for offline consumer
 verification, with no workspace resolution.
 

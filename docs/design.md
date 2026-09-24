@@ -78,8 +78,8 @@ A plugin's default export is its factory. Metadata identifies the plugin contrac
     "apiVersion": 1
   },
   "peerDependencies": {
-    "emulon": "^0.1.0",
-    "hono": "^4.13.8"
+    "emulon": "0.1.0",
+    "hono": "4.13.8"
   }
 }
 ```
@@ -238,7 +238,7 @@ const createIssue = defineCommand({
 });
 ```
 
-Schemas determine validation and inferred SDK types; CLI metadata determines names, descriptions, flags, and file inputs. Command schemas use Zod v4 (`npm:zod@^4`) for type inference and JSON Schema metadata; see [ADR 0002](decisions/0002-schema-library.md). Command inputs and results must have a defined JSON wire representation. Binary content uses explicit file or blob references, not live streams or closures across the control API.
+Schemas determine validation and inferred SDK types; CLI metadata determines names, descriptions, flags, and file inputs. Command schemas use Zod v4 (`npm:zod@4.6.5`) for type inference and JSON Schema metadata; see [ADR 0002](decisions/0002-schema-library.md). Command inputs and results must have a defined JSON wire representation. Binary content uses explicit file or blob references, not live streams or closures across the control API.
 
 A static command declaration maps `issues.create` to `issues create`; plugin package types retain the concrete registry so SDK calls have typed inputs and outputs. Both frontends dispatch through the same handler and validation. Structured CLI output is available with `--json`; failures use nonzero exit codes and stable machine-readable error codes.
 

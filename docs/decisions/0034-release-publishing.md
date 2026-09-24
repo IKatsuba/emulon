@@ -24,9 +24,9 @@ Versioning can be independent per package or shared by all packages.
 ## Decision
 
 All packages share one version. `deno task release version <x.y.z>` updates
-every package manifest, the plugins' `emulon` peer range, the CLI version
-constant and the changelog in one commit, and a `v<x.y.z>` tag triggers the
-`release` workflow.
+every package manifest, the plugins' exact `emulon` peer version, the CLI
+version constant and the changelog in one commit, and a `v<x.y.z>` tag triggers
+the `release` workflow.
 
 The workflow runs the full `check` workflow, verifies that the tag matches every
 package, rebuilds the archives and stages them core first, skipping versions

@@ -44,7 +44,7 @@ Deno.test('Resend imports as a separate package and preserves typed configuratio
     JSON.stringify(first.definition.capabilities) ===
       JSON.stringify(metadata.emulon.capabilities),
   );
-  assert(metadata.peerDependencies.emulon === `^${core.version}`);
+  assert(metadata.peerDependencies.emulon === core.version);
 
   // deno-lint-ignore no-constant-condition
   if (false) {

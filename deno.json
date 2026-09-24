@@ -8,9 +8,9 @@
     "./packages/polar"
   ],
   "imports": {
-    "@deno/dnt": "jsr:@deno/dnt@^0.43.2",
-    "@types/node": "npm:@types/node@^22.20.4",
-    "zod": "npm:zod@^4",
+    "@deno/dnt": "jsr:@deno/dnt@0.43.2",
+    "@types/node": "npm:@types/node@22.20.4",
+    "zod": "npm:zod@4.6.5",
     "typescript": "npm:typescript@5.9.3",
     "resend": "npm:resend@6.28.1",
     "hono": "npm:hono@4.13.8",
