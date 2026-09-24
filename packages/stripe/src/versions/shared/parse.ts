@@ -104,6 +104,16 @@ export function readSession(
   const locale = fields.string('locale');
   const paymentMethodTypes = fields.strings('payment_method_types');
   const uiMode = fields.oneOf('ui_mode', uiModes.values);
+
+  // Refused before the unknown-parameter check: the other modes bring their
+  // own parameters (return_url), and the mode is what is unsupported.
+  if (uiMode !== undefined && uiMode !== uiModes.hosted) {
+    throw invalidRequest(
+      `The local Stripe emulator supports only hosted Checkout (ui_mode ${uiModes.hosted}).`,
+      'ui_mode',
+    );
+  }
+
   const managed = managedPayments
     ? fields.object('managed_payments')
     : undefined;
@@ -126,13 +136,6 @@ export function readSession(
     throw invalidRequest(
       'The local Stripe emulator supports only payment mode.',
       'mode',
-    );
-  }
-
-  if (uiMode !== undefined && uiMode !== uiModes.hosted) {
-    throw invalidRequest(
-      `The local Stripe emulator supports only hosted Checkout (ui_mode ${uiModes.hosted}).`,
-      'ui_mode',
     );
   }
 

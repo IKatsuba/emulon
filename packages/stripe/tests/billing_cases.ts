@@ -483,13 +483,28 @@ export function billingCases(flavor: Flavor, register: Register) {
         } as Stripe.Checkout.SessionCreateParams)).ui_mode === hosted,
       );
 
+      // Embedded modes take return_url instead of success_url and
+      // cancel_url; the mode, not those parameters, is what gets refused.
       for (const mode of unsupported) {
-        await rejects(
-          () =>
-            sdk.checkout.sessions.create({ ...base, ui_mode: mode } as never),
-          (e) =>
-            invalid('ui_mode')(e) && e.message.includes('only hosted Checkout'),
-        );
+        for (
+          const params of [
+            { ...base, ui_mode: mode },
+            {
+              mode: 'payment',
+              line_items: base.line_items,
+              ui_mode: mode,
+              return_url:
+                'http://localhost:3000/return?session={CHECKOUT_SESSION_ID}',
+            },
+          ]
+        ) {
+          await rejects(
+            () => sdk.checkout.sessions.create(params as never),
+            (e) =>
+              invalid('ui_mode')(e) &&
+              e.message.includes('only hosted Checkout'),
+          );
+        }
       }
 
       await rejects(
