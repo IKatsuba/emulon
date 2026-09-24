@@ -502,25 +502,28 @@ Deno.test('Stripe webhook endpoints pin the version of their deliveries', async 
   );
 });
 
+// Runs ahead of the host clock, which still stamps queued deliveries.
 class FakeScheduler implements DeliveryScheduler {
-  time = Date.now();
+  offset = 0;
   jobs = new Map<number, { due: number; callback: () => void }>();
   serial = 0;
-  now = () => this.time;
+  now = () => Date.now() + this.offset;
   schedule = (callback: () => void, delay: number) => {
     const id = ++this.serial;
 
-    this.jobs.set(id, { due: this.time + delay, callback });
+    this.jobs.set(id, { due: this.now() + delay, callback });
 
     return () => {
       this.jobs.delete(id);
     };
   };
   advance(ms: number) {
-    this.time += ms;
+    this.offset += ms;
+
+    const now = this.now();
 
     for (const [id, job] of [...this.jobs]) {
-      if (job.due <= this.time) {
+      if (job.due <= now) {
         this.jobs.delete(id);
         job.callback();
       }
