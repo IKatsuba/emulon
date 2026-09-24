@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { deliverySchema, destinationSchema } from '../deliveries/queue.ts';
+import {
+  deliverySchema,
+  storedDestinationSchema,
+} from '../deliveries/queue.ts';
+import { snapshots, snapshotSchema } from '../deliveries/presentation.ts';
 import { deliveryFaultsSchema } from '../deliveries/faults.ts';
 import type { Snapshot } from './store.ts';
 
@@ -25,9 +29,10 @@ export function validateCoreFormat(snapshot: Snapshot): void {
 
   for (
     const [collection, schema] of [
-      ['emulon.destinations', destinationSchema],
+      ['emulon.destinations', storedDestinationSchema],
       ['emulon.deliveries', deliverySchema],
       ['emulon.attempts', attemptSchema],
+      [snapshots, snapshotSchema],
     ] as const
   ) {
     for (const [id, value] of snapshot.rows.get(collection) ?? []) {

@@ -9,6 +9,7 @@ export type {
   PluginContext,
   PluginDefinition,
   PluginInstance,
+  PluginPresentation,
 } from './plugins/types.ts';
 export { defineCommand } from './commands/define.ts';
 export { DomainError } from './commands/domain-error.ts';
@@ -24,6 +25,8 @@ export {
 export type {
   DeliveryRecord,
   Destination,
+  JsonValue,
+  ProviderSettings,
   SubscriptionPolicy,
 } from './deliveries/queue.ts';
 

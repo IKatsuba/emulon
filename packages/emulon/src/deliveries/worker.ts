@@ -2,8 +2,9 @@ import type { EventRecord, Store } from '../state/store.ts';
 import {
   type DeliveryRecord,
   deliverySchema,
-  destinationSchema,
+  storedDestinationSchema,
 } from './queue.ts';
+import { readSnapshot } from './presentation.ts';
 import { send } from '../runtime/send.ts';
 
 export interface DeliveryAttempt {
@@ -161,7 +162,7 @@ export function deliveryWorker(
           );
           const destination = raw === undefined
             ? undefined
-            : destinationSchema.parse(raw);
+            : storedDestinationSchema.parse(raw);
 
           if (!destination || !destination.enabled) {
             delete delivery.nextAttemptAt;
@@ -183,6 +184,7 @@ export function deliveryWorker(
           const previous = (await tx.list('emulon.attempts')).map((r) =>
             r.value as DeliveryAttempt
           ).filter((a) => a.deliveryId === delivery.id);
+          const snapshot = await readSnapshot(tx, delivery.id);
           const attempt: DeliveryAttempt = {
             id: crypto.randomUUID(),
             deliveryId: delivery.id,
@@ -190,7 +192,7 @@ export function deliveryWorker(
             providerDeliveryId: transport.providerId === 'attempt'
               ? crypto.randomUUID()
               : previous[0]?.providerDeliveryId ?? crypto.randomUUID(),
-            requestBytes: previous[0]?.requestBytes ??
+            requestBytes: snapshot ?? previous[0]?.requestBytes ??
               Array.from(transport.serialize(event)),
             headers: {},
           };
@@ -306,7 +308,7 @@ export function deliveryWorker(
           delivery.destinationId,
         );
 
-        if (!current || !destinationSchema.parse(current).enabled) {
+        if (!current || !storedDestinationSchema.parse(current).enabled) {
           nextAttemptAt = undefined;
         }
 

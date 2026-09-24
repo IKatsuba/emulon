@@ -32,20 +32,21 @@ errors. Existing empty or malformed databases are rejected without reseeding.
 Call `prepare(registrations)` for the complete configured environment before
 running fixture functions or plugin setup. It checks instance plugin identity
 and exact plugin/schema versions, then validates core destinations, deliveries,
-attempts, dispatch markers and fault records for every configured instance.
-Malformed records fail without exposing stored values or changing snapshots.
-SQL, codec and core formats are independently versioned at 1; every persisted
-snapshot, including dormant instances, is decoded and checked for graph/snapshot
-structure at coordinator construction. No migration or implicit reset is
-implemented. Opening an instance requires the prepared registration and database
-UUID, captures detached fixtures for reset, and initializes only missing rows.
-The host performs this whole-environment preflight before fixture functions,
-setup, subscription selection or transport callbacks. Existing rows retain
-resources, credentials and outbox; changed startup fixtures apply only on
-explicit reset. `up` reports a `STATE_RESTORED` notice for restored instances in
-both ordinary and JSON readiness output, with an environment-specific reset
-command and its destructive effect. The notice is unconditional on restore: no
-fixture comparison or persisted fixture fingerprint is introduced.
+attempts, delivery snapshots, dispatch markers and fault records for every
+configured instance. Malformed records fail without exposing stored values or
+changing snapshots. SQL, codec and core formats are independently versioned at
+1; every persisted snapshot, including dormant instances, is decoded and checked
+for graph/snapshot structure at coordinator construction. No migration or
+implicit reset is implemented. Opening an instance requires the prepared
+registration and database UUID, captures detached fixtures for reset, and
+initializes only missing rows. The host performs this whole-environment
+preflight before fixture functions, setup, subscription selection or transport
+callbacks. Existing rows retain resources, credentials and outbox; changed
+startup fixtures apply only on explicit reset. `up` reports a `STATE_RESTORED`
+notice for restored instances in both ordinary and JSON readiness output, with
+an environment-specific reset command and its destructive effect. The notice is
+unconditional on restore: no fixture comparison or persisted fixture fingerprint
+is introduced.
 
 Memory and SQLite share callback serialization, detached drafts, transaction
 lifetimes, generation scopes and observer handling. A changed draft commits

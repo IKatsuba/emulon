@@ -5,7 +5,7 @@ import type { Store, Transaction } from '../state/store.ts';
 import {
   type DeliveryRecord,
   deliverySchema,
-  destinationSchema,
+  storedDestinationSchema,
 } from './queue.ts';
 import { type DeliveryAttempt, inspectAttempt } from './worker.ts';
 
@@ -73,7 +73,7 @@ async function requireDelivery(tx: Transaction, id: string) {
 async function requireDestination(tx: Transaction, id: string) {
   const raw = await tx.get('emulon.destinations', id);
 
-  if (!raw || !destinationSchema.parse(raw).enabled) {
+  if (!raw || !storedDestinationSchema.parse(raw).enabled) {
     throw new DeliveryError('DESTINATION_UNAVAILABLE');
   }
 }

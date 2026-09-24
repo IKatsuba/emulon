@@ -16,6 +16,11 @@ project adheres to [Semantic Versioning](https://semver.org/).
   resolves related objects.
 - `@emulon/stripe` commands to pay or expire a Checkout Session, refund a charge
   and open or close a dispute.
+- `emulon`: optional `PluginDefinition.presentation` hooks. `eventView` shapes
+  the payload shown by event list and follow; `deliverySnapshot` captures the
+  exact webhook body when a delivery is enqueued, and retries, redelivery and
+  restarts send those bytes. Webhook destinations accept an optional JSON
+  `provider` settings object. Plugins without hooks are unchanged.
 
 ### Changed
 

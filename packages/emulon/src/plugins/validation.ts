@@ -82,6 +82,13 @@ export function validateDefinition(value: unknown): void {
     }
   }
 
+  if (
+    value.presentation !== undefined &&
+    typeof value.presentation !== 'function'
+  ) {
+    throw new TypeError('Plugin definition.presentation must be a function.');
+  }
+
   if (value.compatibility !== undefined) {
     const manifest = defineCompatibility(value.compatibility);
 

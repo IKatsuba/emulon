@@ -13,9 +13,12 @@ running environment. Direct send does not fan out through subscriptions.
 Repeating publication with the same payload creates separate events; Emulon does
 not dedupe business meaning. `webhooks.list`, `inspect`, `wait`, and `redeliver`
 expose logical deliveries and their separate attempts. Redelivery retains
-original bytes, regenerates signatures, and never republishes an event. Resend
-retains its provider delivery ID; GitHub creates a new ID for each attempt (ADR
-0020).
+original bytes, regenerates signatures, and never republishes an event. A plugin
+with a `deliverySnapshot` presentation hook fixes those bytes when the delivery
+is enqueued, so a later destination settings change or host restart cannot
+rewrite them; its `eventView` hook shapes the payload shown by `events` list and
+follow. Resend retains its provider delivery ID; GitHub creates a new ID for
+each attempt (ADR 0020).
 
 ## Running scenarios
 

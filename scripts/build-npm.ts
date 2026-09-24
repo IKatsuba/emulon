@@ -122,6 +122,7 @@ for (
       await Deno.readTextFile('packages/github/deno.json'),
     ).peerDependencies.hono;
   }
+
   delete manifest.scripts;
   delete manifest.exports['./internal-state'];
 

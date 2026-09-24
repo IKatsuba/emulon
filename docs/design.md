@@ -172,6 +172,12 @@ interface PluginDefinition<Options, Commands> {
   capabilities: readonly Capability[];
   commands: Commands;
   setup(ctx: PluginContext, options: Options): Promise<PluginInstance>;
+  presentation?(options: Options): PluginPresentation;
+}
+
+interface PluginPresentation {
+  eventView?(event: EventRecord): unknown;
+  deliverySnapshot?(event: EventRecord, destination: Destination): Uint8Array;
 }
 
 interface PluginInstance {
@@ -180,6 +186,8 @@ interface PluginInstance {
   stop(): Promise<void>;
 }
 ```
+
+The optional `presentation` hooks let a plugin show provider views of neutral committed events without core knowing provider versions ([ADR 0036](decisions/0036-stripe-api-version-modules.md)). The host creates them from the instance options before state recovery. `eventView` replaces only the payload returned by event list, follow and CLI output. `deliverySnapshot` runs inside the transaction that enqueues a subscribed or direct delivery; its exact bytes are stored privately with the delivery and sent by every attempt, redelivery and reopened host instead of the transport serializer. Both receive frozen copies, must be deterministic and have no external effects. A shared webhook destination may carry an optional JSON `provider` settings object owned by the plugin; the shared `destinationSchema` command input does not accept it, so plugins that opt in expose their own typed fields. Plugins that omit hooks and settings keep the canonical payload and serializer bytes.
 
 The `managed-engine` capability is retained in this contract for future work; it has no implementation or plugins in the first version.
 
@@ -308,7 +316,7 @@ interface DeliveryAttempt {
 }
 ```
 
-The actual schema also retains serialized request bytes, safe header metadata, bounded response content, and the provider delivery identifier. Secrets and authorization headers are redacted from ordinary inspection. Redelivery preserves the event body and creates a new attempt; provider adapters define identifier reuse and signature regeneration behavior.
+The actual schema also retains serialized request bytes, safe header metadata, bounded response content, and the provider delivery identifier. Secrets and authorization headers are redacted from ordinary inspection. When a plugin supplies `deliverySnapshot`, the body is captured when the delivery is enqueued rather than at the first attempt. Redelivery preserves the event body and creates a new attempt; provider adapters define identifier reuse and signature regeneration behavior.
 
 The worker uses a transport adapter to create provider-specific headers and signatures over the exact bytes it sends. Plugins define timeouts, success criteria, and retry schedules. Core supports retries but never imposes them on every provider. GitHub does not automatically redeliver failures, so its default is manual redelivery. [GitHub failure handling](https://docs.github.com/en/webhooks/using-webhooks/handling-failed-webhook-deliveries).
 

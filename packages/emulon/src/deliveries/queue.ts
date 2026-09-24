@@ -2,12 +2,22 @@ import { faultSchedule, readDeliveryFaults } from './faults.ts';
 import { z } from 'zod';
 import type { EventRecord, Store, Transaction } from '../state/store.ts';
 
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonValue[]
+  | { [key: string]: JsonValue };
+export type ProviderSettings = { [key: string]: JsonValue };
 export interface Destination {
   id: string;
   url: string;
   secret: string;
   types: string[];
   enabled: boolean;
+  /** Plugin-owned JSON settings; plugins that do not opt in omit it. */
+  provider?: ProviderSettings | undefined;
 }
 export interface DeliveryRecord {
   id: string;
@@ -35,6 +45,14 @@ export const destinationSchema: z.ZodType<Destination, Destination> =
 export const destinationViewSchema: z.ZodType<Omit<Destination, 'secret'>> =
   destinationObject.omit({ secret: true })
     .strip();
+// Stored rows may carry settings that the shared command schemas do not accept.
+const storedObject = destinationObject.extend({
+  provider: z.record(z.string(), z.json()).optional(),
+});
+export const storedDestinationSchema: z.ZodType<Destination, Destination> =
+  storedObject;
+const storedViewSchema: z.ZodType<Omit<Destination, 'secret'>> = storedObject
+  .omit({ secret: true }).strip();
 export const deliverySchema: z.ZodType<DeliveryRecord> = z.object({
   id: z.string(),
   eventId: z.string(),
@@ -68,7 +86,7 @@ export function destinationFixture(
   input: Destination,
   policy: SubscriptionPolicy,
 ): { collection: string; id: string; value: Destination } {
-  const value = destinationSchema.parse(input);
+  const value = storedDestinationSchema.parse(input);
 
   if (!value.secret && !policy.allowUnsigned) {
     throw new Error('Signing secret is required.');
@@ -105,7 +123,7 @@ export async function setDestination(
       }
     }
 
-    return destinationViewSchema.parse(row.value);
+    return storedViewSchema.parse(row.value);
   });
 }
 
@@ -114,7 +132,7 @@ export function listDestinations(
 ): Promise<Omit<Destination, 'secret'>[]> {
   return store.transaction(async (tx) =>
     (await tx.list(destinations)).map((row) =>
-      destinationViewSchema.parse(row.value)
+      storedViewSchema.parse(row.value)
     )
   );
 }
@@ -131,7 +149,7 @@ export async function dispatch(
 ): Promise<void> {
   const faults = await readDeliveryFaults(tx);
   const subscriptions = (await tx.list(destinations)).map((row) =>
-    destinationSchema.parse(row.value)
+    storedDestinationSchema.parse(row.value)
   );
 
   for (const event of await tx.outbox()) {

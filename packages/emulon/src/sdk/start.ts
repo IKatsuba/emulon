@@ -3,8 +3,13 @@
 import { deliveryWorker, recoverAttempts } from '../deliveries/worker.ts';
 import { cloneState } from '../state/clone.ts';
 import type { Coordinator } from '../runtime/sqlite-state.ts';
-import type { Store } from '../state/store.ts';
+import type { EventRecord, Store } from '../state/store.ts';
 import { dispatchingStore } from '../deliveries/queue.ts';
+import {
+  readPresentation,
+  snapshottingStore,
+  viewEvent,
+} from '../deliveries/presentation.ts';
 import {
   checkVersion,
   memoryAdapter,
@@ -15,7 +20,7 @@ import {
 import { eventFilter, eventHub, type Events } from '../events/stream.ts';
 import { readRegistration } from '../plugins/define.ts';
 import { httpContext } from '../plugins/http.ts';
-import type { PluginInstance } from '../plugins/types.ts';
+import type { PluginInstance, PluginPresentation } from '../plugins/types.ts';
 import { type Configuration, validateConfig } from './load.ts';
 
 import {
@@ -57,6 +62,7 @@ export async function startWithAdapter<const Config extends Configuration>(
   const owned: {
     host: ReturnType<typeof httpContext>;
     instance?: PluginInstance;
+    presentation?: PluginPresentation | undefined;
     state?: StateHandle;
     worker?: ReturnType<typeof deliveryWorker>;
   }[] = [];
@@ -174,9 +180,33 @@ export async function startWithAdapter<const Config extends Configuration>(
         schemaVersion: definition.state?.schemaVersion ?? 1,
       };
 
+      const presentation = entry.presentation = definition.presentation
+        ? readPresentation(definition.presentation(options))
+        : undefined;
+
       entry.state = await adapter.open({
         environmentId,
-        onEvent: hub.publish,
+        onEvent: presentation?.eventView
+          ? (event) => {
+            let view: EventRecord;
+
+            try {
+              view = viewEvent(event, presentation);
+            } catch {
+              // Never show followers the canonical fact in place of its view.
+              hub.interrupt(
+                new CommandError(
+                  'EVENT_STREAM_INTERRUPTED',
+                  'Event stream interrupted.',
+                ),
+              );
+
+              return;
+            }
+
+            hub.publish(view);
+          }
+          : hub.publish,
         instanceId: name,
         version,
         fixtures: fixtures.get(name)!,
@@ -190,9 +220,12 @@ export async function startWithAdapter<const Config extends Configuration>(
         throw error;
       }
 
-      let store = definition.subscriptions
-        ? dispatchingStore(entry.state.store, definition.subscriptions)
+      const state = presentation?.deliverySnapshot
+        ? snapshottingStore(entry.state.store, presentation.deliverySnapshot)
         : entry.state.store;
+      let store = definition.subscriptions
+        ? dispatchingStore(state, definition.subscriptions)
+        : state;
 
       await store.transaction(() => Promise.resolve());
 
@@ -313,8 +346,10 @@ export async function startWithAdapter<const Config extends Configuration>(
         checkEvents(generation);
 
         const records = (await Promise.all(owned.map((entry) =>
-          entry.state!.store.transaction((tx) =>
-            tx.outbox()
+          entry.state!.store.transaction(async (tx) =>
+            (await tx.outbox()).map((event) =>
+              viewEvent(event, entry.presentation)
+            )
           )
         )).catch((error) => {
           checkEvents(generation);
@@ -362,7 +397,9 @@ export async function startWithAdapter<const Config extends Configuration>(
             entry.host.pause()
           ),
         ]);
-        await Promise.all(owned.map((entry) => entry.worker?.pause()));
+        await Promise.all(owned.map((entry) =>
+          entry.worker?.pause()
+        ));
 
         if (stopping) {
           throw new Error('Environment is disposed.');

@@ -95,3 +95,46 @@ Deno.test('core format rejects malformed attempt fields, mismatched row identity
     }
   }
 });
+
+Deno.test('core format checks delivery snapshots and destination provider settings', () => {
+  const destination = {
+    id: 'hook',
+    url: 'http://127.0.0.1/hook',
+    secret: 'secret',
+    types: ['item.saved'],
+    enabled: true,
+  };
+
+  validateCoreFormat(
+    snapshot('emulon.delivery-snapshots', 'd', { id: 'd', bytes: [0, 255] }),
+  );
+  validateCoreFormat(snapshot('emulon.destinations', 'hook', {
+    ...destination,
+    provider: { version: 'b', nested: [null, 1] },
+  }));
+
+  for (
+    const [collection, id, value] of [
+      ['emulon.delivery-snapshots', 'd', { id: 'd', bytes: [256] }],
+      ['emulon.delivery-snapshots', 'd', { id: 'other', bytes: [] }],
+      ['emulon.delivery-snapshots', 'd', { id: 'd', bytes: [], extra: 1 }],
+      ['emulon.destinations', 'hook', { ...destination, provider: 'b' }],
+      ['emulon.destinations', 'hook', {
+        ...destination,
+        provider: { at: new Date(0) },
+      }],
+    ] as const
+  ) {
+    try {
+      validateCoreFormat(snapshot(collection, id, value));
+    } catch (error) {
+      if ((error as Error).message !== 'Invalid core state record format.') {
+        throw error;
+      }
+
+      continue;
+    }
+
+    throw new Error('Expected rejection: ' + JSON.stringify(value));
+  }
+});
