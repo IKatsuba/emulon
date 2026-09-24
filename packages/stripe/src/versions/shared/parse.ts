@@ -9,7 +9,6 @@ import { readExpand, readPage } from '../common.ts';
 
 const productId = /^[a-zA-Z0-9_-]{1,255}$/;
 const couponId = /^[a-zA-Z0-9_-]{1,255}$/;
-const codeFormat = /^[a-zA-Z0-9_-]{1,500}$/;
 const taxCode = /^txcd_\d{8}$/;
 
 function currency(fields: Fields, required: boolean): string | undefined {
@@ -543,6 +542,12 @@ const shared: { [Op in Exclude<OperationId, Versioned>]: Parser<Op> } = {
   'disputes.get': none,
 };
 
+/** Which characters a version accepts in a customer-facing code. */
+export interface CodeFormat {
+  pattern: RegExp;
+  message: string;
+}
+
 /**
  * The rest of a promotion code once a version has read which coupon it
  * discounts with, in whatever shape that version names it.
@@ -550,6 +555,7 @@ const shared: { [Op in Exclude<OperationId, Versioned>]: Parser<Op> } = {
 export function readPromotionCode(
   fields: Fields,
   coupon: string,
+  codeFormat: CodeFormat,
 ): Inputs['promotion_codes.create'] {
   const code = fields.string('code', { max: 500 });
   const expiresAt = fields.int('expires_at', { min: 0 });
@@ -567,11 +573,8 @@ export function readPromotionCode(
   restrictions?.done();
   fields.done();
 
-  if (code !== undefined && !codeFormat.test(code)) {
-    throw invalidRequest(
-      'Promotion codes may contain only letters, digits, - and _.',
-      'code',
-    );
+  if (code !== undefined && !codeFormat.pattern.test(code)) {
+    throw invalidRequest(codeFormat.message, 'code');
   }
 
   if (

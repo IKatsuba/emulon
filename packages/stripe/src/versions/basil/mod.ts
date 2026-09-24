@@ -30,9 +30,15 @@ const { project } = projector(
       : undefined,
 );
 
+// Basil's reference allows only letters and digits in a code.
+const codeFormat = {
+  pattern: /^[a-zA-Z0-9]{1,500}$/,
+  message: 'Promotion codes may contain only letters and digits.',
+};
+
 const parse = parser({
   'promotion_codes.create': (fields) =>
-    readPromotionCode(fields, fields.required('coupon')),
+    readPromotionCode(fields, fields.required('coupon'), codeFormat),
   // Basil predates Stripe-managed payments.
   'checkout.sessions.create': (fields) =>
     readSession(fields, { managedPayments: false }),

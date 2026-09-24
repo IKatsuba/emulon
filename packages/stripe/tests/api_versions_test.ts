@@ -540,6 +540,55 @@ Deno.test('Stripe basil embeds the coupon where dahlia nests promotion, and each
   assert(!orphan.value.active);
 });
 
+Deno.test('Stripe checks promotion code characters by the reference of each version', async () => {
+  const { env, apiKey } = await started(both);
+
+  await using _ = env;
+
+  const api = env.endpoints.stripe.api!;
+  const dahlia = client(dahliaFlavor, api, apiKey);
+  const basil = client(basilFlavor, api, apiKey);
+  const coupon = await dahlia.coupons.create({ percent_off: 5 });
+
+  // stripe@18.0.0: letters and digits only.
+  for (const code of ['BAD-CODE', 'BAD_CODE']) {
+    const rejected = await failure(() =>
+      basil.promotionCodes.create({ coupon: coupon.id, code } as never)
+    );
+
+    assert(
+      rejected instanceof basilFlavor.Stripe.errors.StripeInvalidRequestError,
+    );
+    assert(rejected.param === 'code');
+  }
+
+  const plain = await basil.promotionCodes.create(
+    { coupon: coupon.id, code: 'BASIL2025' } as never,
+  );
+
+  assert(plain.code === 'BASIL2025');
+
+  // stripe@22.1.1: dashes too, still no underscores.
+  const dashed = await dahlia.promotionCodes.create({
+    promotion: { type: 'coupon', coupon: coupon.id },
+    code: 'DAHLIA-2026',
+  });
+
+  assert(dashed.code === 'DAHLIA-2026');
+
+  const underscored = await failure(() =>
+    dahlia.promotionCodes.create({
+      promotion: { type: 'coupon', coupon: coupon.id },
+      code: 'DAHLIA_2026',
+    })
+  );
+
+  assert(
+    underscored instanceof dahliaFlavor.Stripe.errors.StripeInvalidRequestError,
+  );
+  assert(underscored.param === 'code');
+});
+
 Deno.test('Stripe binds an idempotency key to the version that first used it', async () => {
   const { env, apiKey } = await started(both);
 

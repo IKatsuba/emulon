@@ -21,6 +21,12 @@ const { project } = projector(
     Object.hasOwn(references, property) ? references[property] : undefined,
 );
 
+// Dahlia's reference adds dashes to letters and digits.
+const codeFormat = {
+  pattern: /^[a-zA-Z0-9-]{1,500}$/,
+  message: 'Promotion codes may contain only letters, digits and -.',
+};
+
 const parse = parser({
   'promotion_codes.create': (fields) => {
     const promotion = fields.object('promotion');
@@ -45,7 +51,7 @@ const parse = parser({
 
     promotion.done();
 
-    return readPromotionCode(fields, coupon);
+    return readPromotionCode(fields, coupon, codeFormat);
   },
   'checkout.sessions.create': (fields) =>
     readSession(fields, { managedPayments: true }),
