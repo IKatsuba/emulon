@@ -39,7 +39,6 @@
     "useBraces": "always",
     "singleBodyPosition": "nextLine",
     "exclude": [
-      "CLAUDE.md",
       "AGENTS.md",
       "docs/design.md"
     ]
