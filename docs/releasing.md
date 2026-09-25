@@ -68,6 +68,10 @@ is published by hand from a machine logged in to npm with 2FA:
    git push origin main v0.1.0
    ```
 
+A package added after the first release, such as `@emulon/telegram`, follows the
+same path for its first version: publish its archive by hand before pushing the
+tag, and the workflow stages it from the next release on.
+
 ## CI credentials
 
 Use one of these for the `release` workflow:
