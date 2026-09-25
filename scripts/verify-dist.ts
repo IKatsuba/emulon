@@ -293,7 +293,8 @@ process.emitWarning("SQLite is an experimental feature and might change at any t
             !Object.keys(manifest[field] ?? {}).some((name) =>
               name === 'octokit' || name.startsWith('@octokit/') ||
               name.startsWith('@polar-sh/') || name.startsWith('@stablelib/') ||
-              name === 'grammy' || name.startsWith('@grammyjs/')
+              name === 'grammy' || name.startsWith('@grammyjs/') ||
+              name === 'md-to-telegram'
             ),
           `${name} ships an unexpected compiler or provider-test dependency`,
         );

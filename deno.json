@@ -33,7 +33,8 @@
     "build:npm": "deno run -A scripts/build-npm.ts",
     "verify:dist": "deno run -A scripts/verify-dist.ts",
     "release": "deno run --allow-read=. --allow-write=. scripts/release.ts",
-    "example:github-app": "deno run --allow-net=127.0.0.1 --allow-env=NODE_ENV examples/github-app/main.ts"
+    "example:github-app": "deno run --allow-net=127.0.0.1 --allow-env=NODE_ENV examples/github-app/main.ts",
+    "example:telegram": "deno run --allow-net=127.0.0.1 --allow-env examples/telegram/main.ts"
   },
   "fmt": {
     "lineWidth": 80,

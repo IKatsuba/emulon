@@ -202,8 +202,14 @@ shut-down poll ends at once, reset with the 503 envelope, on each runtime's own
 listener. A wrong token receives the 401 envelope, a malformed one 404,
 `setWebhook` 501 and an unknown method 404; after reset the old token fails even
 though the next bot reuses its ID. The manifest matches npm metadata and the
-installed command. See [the package guide](../packages/telegram/README.md) and
-the [installed proof](../scripts/telegram-proof.ts). `grammy@1.44.0` and
+installed command. A project host then runs the declared consumer's loop: a
+first `getUpdates` without an offset, a two-part post by ID and `@username` with
+the consumer's send options, reactions set through the installed CLI and the
+connected SDK, and a drain with `limit: 100`, `timeout: 0` and `allowed_updates`
+until an empty batch, after which the stored offset reads nothing. The CLI and
+SDK agree on the manifest, `messages list` and `updates inspect`. See
+[the package guide](../packages/telegram/README.md) and the
+[installed proof](../scripts/telegram-proof.ts). `grammy@1.44.0` and
 `md-to-telegram@0.1.1` are development-only imports and are never shipped or
 packed for consumers.
 

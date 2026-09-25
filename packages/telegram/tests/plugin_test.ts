@@ -40,11 +40,17 @@ import {
   updateTypes,
 } from '../src/model/updates.ts';
 import { cases as botCases } from './bot_cases.ts';
+import { cases as consumerCases } from './consumer_cases.ts';
 import { cases as messageCases } from './message_cases.ts';
 import { cases as updateCases } from './update_cases.ts';
 import { assert, equal, rejects } from './assert.ts';
 
-const cases = [...botCases, ...messageCases, ...updateCases];
+const cases = [
+  ...botCases,
+  ...messageCases,
+  ...updateCases,
+  ...consumerCases,
+];
 
 verifyCoverage(compatibility, cases);
 
@@ -417,4 +423,34 @@ Deno.test('reaction snapshots drop zero counts and sort deterministically', () =
 
     throw new Error('Accepted a duplicate reaction');
   }
+});
+
+Deno.test('the example publishes a post and receives its reaction by polling', async () => {
+  // grammY's logger reads the whole environment when it loads, which this
+  // suite does not grant, so the example runs as its documented task does.
+  const { code, stdout, stderr } = await new Deno.Command(Deno.execPath(), {
+    args: ['task', '--quiet', 'example:telegram'],
+    cwd: new URL('../../..', import.meta.url),
+    stdout: 'piped',
+    stderr: 'piped',
+  }).output();
+
+  assert(code === 0, new TextDecoder().decode(stderr));
+
+  const result = JSON.parse(new TextDecoder().decode(stdout));
+
+  equal(result.posted.map((message: { chat: string }) => message.chat), [
+    '@local_news',
+  ]);
+  equal(
+    result.updates.map((update: Update) => [
+      update.update_id,
+      update.message_reaction_count?.message_id,
+      update.message_reaction_count?.reactions.map((reaction) =>
+        reaction.total_count
+      ),
+    ]),
+    [[1, 1, [3, 1]]],
+  );
+  equal(result.nextOffset, 2);
 });

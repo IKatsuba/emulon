@@ -25,6 +25,7 @@ export const compatibility: CompatibilityManifest = defineCompatibility({
         'telegram.bots.1',
         'telegram.bots.2',
         'telegram.bots.3',
+        'telegram.consumer.1',
       ],
     },
     {
@@ -50,6 +51,7 @@ export const compatibility: CompatibilityManifest = defineCompatibility({
         'telegram.messages.1',
         'telegram.messages.2',
         'telegram.messages.3',
+        'telegram.consumer.1',
       ],
     },
     {
@@ -74,6 +76,7 @@ export const compatibility: CompatibilityManifest = defineCompatibility({
         'telegram.updates.1',
         'telegram.updates.2',
         'telegram.updates.3',
+        'telegram.consumer.1',
       ],
     },
   ],
@@ -217,6 +220,12 @@ export const compatibility: CompatibilityManifest = defineCompatibility({
           'telegram.updates.1',
           'telegram.updates.2',
           'telegram.updates.3',
+        ],
+      },
+      {
+        'path': 'packages/telegram/tests/consumer_cases.ts',
+        'cases': [
+          'telegram.consumer.1',
         ],
       },
     ],

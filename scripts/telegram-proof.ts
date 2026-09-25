@@ -4,14 +4,18 @@ import { compatibility } from '../packages/telegram/src/compatibility.ts';
  * Telegram smoke for the installed archive: no workspace imports, no grammY
  * and no provider access. The requests are the ones grammY sends: POST
  * `<apiRoot>/bot<token>/<method>` with a JSON body. Long polls run on the
- * runtime's own listener, so cancellation is proven under Node and Deno.
+ * runtime's own listener, so cancellation is proven under Node and Deno. A
+ * project host then runs the declared consumer's publish-and-drain loop with
+ * reactions set by the installed CLI and SDK, comparing both views.
  */
 export function telegramProof(prefix: string): string {
   return `
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { connect } from "node:net";
 import { Emulon, defineCompatibility } from "${prefix}emulon";
 import telegram from "${prefix}@emulon/telegram";
+import { serveEnvironment } from "./node_modules/emulon/esm/control/server.js";
+import { runProjectCLI } from "./node_modules/emulon/esm/cli/project.js";
 const manifest = ${JSON.stringify(compatibility)};
 function assert(value, message) { if (!value) throw new Error(message); }
 function equal(actual, expected, label) {
@@ -111,6 +115,66 @@ await stopped.dispose();
 const stopOutcome = await stopping;
 assert(stopOutcome === 503 || stopOutcome === "network", "Shutdown answered the poll with " + stopOutcome);
 assert(performance.now() - stopStarted < 5000, "Shutdown waited for the poll");
-console.log("Telegram installed getMe, sendMessage, messages list, reactions, getUpdates, long poll cancellation, token rejection, 501 methods, reset and manifest parity passed");
+const directory = "./telegram-project";
+await mkdir(directory);
+const config = { services: { tg: telegram({ fixtures: { channels: [channel] } }) } };
+const host = await serveEnvironment(config, { directory });
+let connected;
+try {
+  connected = await Emulon.connect({ config, directory });
+  const tg = connected.services.tg;
+  const cli = async (...args) => {
+    const result = await runProjectCLI(["tg", ...args, "--json"], undefined, directory);
+    if (result.code !== 0) throw new Error("Telegram CLI failed: " + args.slice(0, 2).join(" "));
+    return JSON.parse(result.stdout);
+  };
+  equal(await cli("compatibility", "get"), manifest, "CLI manifest");
+  equal(await tg.compatibility.get({}), manifest, "connected manifest");
+  const issued = await cli("bots", "create", "--username", "project_bot", "--first-name", "Project");
+  const method = async (name, body) => {
+    const response = await fetch(connected.endpoints.tg.api + "/bot" + issued.token + "/" + name, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
+    });
+    const envelope = await response.json();
+    if (!envelope.ok) throw new Error("Telegram " + name + " failed with " + envelope.error_code);
+    return envelope.result;
+  };
+  // One run of the declared consumer: drain from the stored offset, or from the
+  // start on a first run, and store update_id + 1 of the last update.
+  const drain = async (stored) => {
+    const updates = [];
+    let offset = stored;
+    while (true) {
+      const batch = await method("getUpdates", { ...(offset === undefined ? {} : { offset }), limit: 100, timeout: 0, allowed_updates: ["message_reaction_count"] });
+      if (batch.length === 0) return { updates, offset };
+      updates.push(...batch);
+      offset = batch.at(-1).update_id + 1;
+    }
+  };
+  const first = await drain(undefined);
+  equal(first, { updates: [], offset: undefined }, "first consumer run");
+  const options = { parse_mode: "MarkdownV2", disable_notification: true, link_preview_options: { is_disabled: false } };
+  const parts = ["*Digest* part 1\\\\.", "_Digest_ part 2\\\\."];
+  equal([(await method("sendMessage", { chat_id: channel.id, text: parts[0], ...options })).message_id, (await method("sendMessage", { chat_id: "@" + channel.username, text: parts[1], ...options })).message_id], [1, 2], "multipart post");
+  const listed = await tg.messages.list({ chatId: channel.id });
+  equal(listed.map((message) => message.source), parts, "listed parts");
+  equal(await cli("messages", "list", "--chat-id", String(channel.id)), listed, "messages list parity");
+  const counts = (total_count) => [{ type: { type: "emoji", emoji: "👍" }, total_count }];
+  equal((await cli("reactions", "set", "--chat-id", String(channel.id), "--message-id", "1", "--reactions", JSON.stringify(counts(2)))).queued, 1, "CLI reaction");
+  equal((await tg.reactions.set({ chatId: channel.id, messageId: 2, reactions: counts(5) })).queued, 1, "SDK reaction");
+  const inspected = await tg.updates.inspect({ botId: issued.id });
+  equal(await cli("updates", "inspect", "--bot-id", String(issued.id)), inspected, "updates inspect parity");
+  equal([inspected.allowedUpdates, inspected.pending], [["message_reaction_count"], 2], "inspected queue");
+  const second = await drain(first.offset);
+  equal(second.updates, inspected.updates, "drained updates");
+  equal(second.updates.map((update) => [update.update_id, update.message_reaction_count.message_id, update.message_reaction_count.reactions]), [[1, 1, counts(2)], [2, 2, counts(5)]], "drained reactions");
+  equal(second.offset, 3, "stored offset");
+  equal((await tg.updates.inspect({ botId: issued.id })).pending, 0, "confirmed queue");
+  equal(await drain(second.offset), { updates: [], offset: 3 }, "next consumer run");
+} finally {
+  await connected?.dispose();
+  await host.dispose();
+}
+console.log("Telegram installed getMe, sendMessage, messages list, reactions, getUpdates, long poll cancellation, token rejection, 501 methods, reset, consumer drain and CLI/SDK/manifest parity passed");
 `;
 }

@@ -40,6 +40,23 @@ console.log(post.message_id, post.text, post.entities);
 console.log(await env.services.tg.messages.list({ chatId: -1001234567890 }));
 ```
 
+## Run the example
+
+From the repository root:
+
+```sh
+deno task example:telegram
+```
+
+The [example](../../examples/telegram/README.md) starts an instance with one
+channel, issues a bot, has it convert a Markdown post with `md-to-telegram`,
+split it and publish each part to `@local_news` as silent MarkdownV2 messages
+with link previews enabled, sets a reaction on the post and reads it back
+through `getUpdates`. It prints the published messages with their entities, the
+`message_reaction_count` update and the offset to store for the next run.
+
+## Connection and commands
+
 The endpoint URL is grammY's `apiRoot` as is, without a trailing slash; grammY
 requests `<apiRoot>/bot<token>/<method>`. For a running project configured with
 instance `tg`:
@@ -100,29 +117,41 @@ in Telegram: call `getUpdates` with
 `allowed_updates: ['message_reaction_count']` first. A reaction set before that
 never reaches the bot.
 
+A consumer that runs on a schedule keeps the offset between runs. On its first
+run it has none; each run drains until an empty batch, and that empty call with
+the new offset is what confirms the batch before it:
+
 ```ts
-await bot.api.getUpdates({ allowed_updates: ['message_reaction_count'] });
+async function drain(bot: Bot, stored: number | undefined) {
+  let offset = stored;
+
+  while (true) {
+    const updates = await bot.api.getUpdates({
+      ...(offset === undefined ? {} : { offset }),
+      limit: 100,
+      timeout: 0,
+      allowed_updates: ['message_reaction_count'],
+    });
+
+    if (updates.length === 0) {
+      return offset; // store it for the next run
+    }
+
+    for (const update of updates) {
+      console.log(update.message_reaction_count?.reactions);
+    }
+
+    offset = updates.at(-1)!.update_id + 1;
+  }
+}
+
+let offset = await drain(bot, undefined); // subscribes, finds nothing
 await env.services.tg.reactions.set({
   chatId: -1001234567890,
   messageId: post.message_id,
   reactions: [{ type: { type: 'emoji', emoji: '👍' }, total_count: 3 }],
 });
-
-let offset: number | undefined;
-
-while (true) {
-  const updates = await bot.api.getUpdates({ offset, limit: 100, timeout: 0 });
-
-  if (updates.length === 0) {
-    break;
-  }
-
-  for (const update of updates) {
-    console.log(update.message_reaction_count?.reactions);
-  }
-
-  offset = updates.at(-1)!.update_id + 1;
-}
+offset = await drain(bot, offset); // prints the 👍 3 count
 ```
 
 `reactions set` (`reactions.set`) replaces the absolute counts of a sent channel
@@ -160,5 +189,24 @@ an unknown method receives 404 and a known but unimplemented one, including
 object body is emulated. Descriptions are fixed and never contain the token, the
 path or request input.
 
+## Limitations
+
+The [compatibility manifest](src/compatibility.ts) lists every limitation; in
+short, this is not a general Bot API:
+
+- Only `getMe`, `sendMessage` and `getUpdates` exist; every other method,
+  including the webhook methods, returns 501. There is no webhook mode, so
+  updates arrive only by polling.
+- Bots post only to configured channels; there are no users, groups, private
+  chats, media, keyboards, inline mode or payments.
+- The only update type is `message_reaction_count`, and only the `reactions set`
+  command produces it; bots cannot set reactions.
+- MarkdownV2 is limited to what `md-to-telegram` emits, and error descriptions
+  are fixed, without the offset Telegram appends.
+- An overlapping `getUpdates` receives 409 instead of ending the earlier one.
+
 Tests use `grammy@1.44.0` and `md-to-telegram@0.1.1` on loopback and never reach
-Telegram; neither is a dependency of this package.
+Telegram. The consumer suite runs the complete publish-and-drain loop above
+through grammY, with reactions set by the CLI and SDK. Neither client is a
+dependency of this package, and the installed archive checks under Node and Deno
+assert that.
