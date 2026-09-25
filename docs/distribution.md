@@ -188,6 +188,18 @@ UTC-only attendees. See [the package guide](../packages/calcom/README.md) and
 [installed contract proof](../scripts/calcom-proof.ts). No Cal.com client or
 React dependency is shipped.
 
+## Telegram bot foundation
+
+The build also publishes `@emulon/telegram`. Offline installed Node and Deno
+consumers start an instance with one fixture channel, issue a bot through the
+SDK and call `getMe` with the requests grammY sends. A wrong token receives the
+401 envelope, a malformed one 404, `setWebhook` 501 and an unknown method 404;
+after reset the old token fails even though the next bot reuses its ID. The
+manifest matches npm metadata and the installed command. See
+[the package guide](../packages/telegram/README.md) and the
+[installed proof](../scripts/telegram-proof.ts). `grammy@1.44.0` is a
+development-only import and is never shipped or packed for consumers.
+
 ## Combined Stripe and Cal.com example
 
 The [runnable example](../examples/stripe-calcom/README.md) is copied unchanged

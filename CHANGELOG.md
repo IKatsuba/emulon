@@ -8,6 +8,11 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `@emulon/telegram`: a Telegram Bot API emulator for the pinned grammY client.
+  `bots create` issues a bot token once, the `api` endpoint serves
+  `/bot<token>/getMe` with Bot API envelopes, and `fixtures.channels` declares
+  channels. Other typed Bot API methods, including the webhook methods, return
+  explicit 501 errors.
 - `@emulon/stripe`: products, one-time prices, coupons, promotion codes, hosted
   Checkout Sessions with a local payment page, payment intents, charges, refunds
   and disputes, with `checkout.session.completed`, `checkout.session.expired`,

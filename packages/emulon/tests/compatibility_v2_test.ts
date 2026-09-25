@@ -4,6 +4,7 @@ import { compatibility as github } from '../../github/src/compatibility.ts';
 import { compatibility as polar } from '../../polar/src/compatibility.ts';
 import { compatibility as resend } from '../../resend/src/compatibility.ts';
 import { compatibility as stripe } from '../../stripe/src/compatibility.ts';
+import { compatibility as telegram } from '../../telegram/src/compatibility.ts';
 import { runProjectCLI } from '../src/cli/project.ts';
 import { serveEnvironment } from '../src/control/server.ts';
 import { readRegistration } from '../src/plugins/define.ts';
@@ -64,7 +65,7 @@ for (const test of cases) {
 }
 
 Deno.test('existing version-1 manifests remain valid unchanged', () => {
-  for (const manifest of [calcom, github, polar, resend]) {
+  for (const manifest of [calcom, github, polar, resend, telegram]) {
     equal(manifest.schemaVersion, 1, manifest.plugin);
     equal(defineCompatibility(structuredClone(manifest)), manifest);
   }

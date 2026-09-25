@@ -8,6 +8,7 @@ import {
 import ts from 'typescript';
 import { managerProof } from './manager-proof.ts';
 import { polarAcceptance, polarProof } from './polar-proof.ts';
+import { telegramProof } from './telegram-proof.ts';
 import { addProof } from './add-proof.ts';
 import { durableProof } from './durable-proof.ts';
 import { withoutTypeStrippingNotice } from './runtime-warnings.ts';
@@ -16,7 +17,15 @@ const root = new URL('../', import.meta.url);
 const archives = [];
 
 for (
-  const service of ['emulon', 'resend', 'github', 'stripe', 'calcom', 'polar']
+  const service of [
+    'emulon',
+    'resend',
+    'github',
+    'stripe',
+    'calcom',
+    'polar',
+    'telegram',
+  ]
 ) {
   const config = JSON.parse(
     await Deno.readTextFile(new URL(`packages/${service}/deno.json`, root)),
@@ -237,6 +246,7 @@ process.emitWarning("SQLite is an experimental feature and might change at any t
         '@emulon/stripe',
         '@emulon/calcom',
         '@emulon/polar',
+        '@emulon/telegram',
         'hono',
         '@hono/node-server',
       ]
@@ -282,7 +292,8 @@ process.emitWarning("SQLite is an experimental feature and might change at any t
             !manifest[field]?.standardwebhooks &&
             !Object.keys(manifest[field] ?? {}).some((name) =>
               name === 'octokit' || name.startsWith('@octokit/') ||
-              name.startsWith('@polar-sh/') || name.startsWith('@stablelib/')
+              name.startsWith('@polar-sh/') || name.startsWith('@stablelib/') ||
+              name === 'grammy' || name.startsWith('@grammyjs/')
             ),
           `${name} ships an unexpected compiler or provider-test dependency`,
         );
@@ -521,6 +532,12 @@ console.log("STATE_IN_USE before instance preparation");
       denoArgs,
       archives,
     });
+    await Deno.writeTextFile(`${cwd}/telegram.mjs`, telegramProof(prefix));
+    await run(
+      'installed Telegram bot foundation',
+      runtime === 'Node' ? 'node' : Deno.execPath(),
+      runtime === 'Node' ? ['telegram.mjs'] : [...denoArgs, 'telegram.mjs'],
+    );
     await Deno.writeTextFile(`${cwd}/calcom.mjs`, calcomProof(prefix));
     await run(
       'installed Cal.com contract',
@@ -1382,6 +1399,31 @@ const polarEndpoint: string = polarStarted.endpoints.billing.api;
 void polarEndpoint;
 await polarConnected.dispose();
 await polarStarted.dispose();
+import telegram from "@emulon/telegram";
+const telegramStarted = await Emulon.start({ services: { tg: telegram({ fixtures: { channels: [{ id: -1001234567890, title: "News", username: "local_news" }] } }) } });
+const issuedBot = await telegramStarted.services.tg.bots.create({ username: "typed_bot", firstName: "Typed" });
+const botId: number = issuedBot.id;
+const botToken: string = issuedBot.token;
+const telegramManifest: import("emulon").CompatibilityManifest = await telegramStarted.services.tg.compatibility.get({});
+// @ts-expect-error Telegram bot creation takes camelCase management input.
+telegramStarted.services.tg.bots.create({ username: "typed_bot", first_name: "Typed" });
+// @ts-expect-error Telegram bot creation needs a first name.
+telegramStarted.services.tg.bots.create({ username: "typed_bot" });
+// @ts-expect-error Telegram channel IDs are numbers.
+telegram({ fixtures: { channels: [{ id: "-1001234567890", title: "News", username: "local_news" }] } });
+// @ts-expect-error Telegram options must not become any.
+telegram({ unexpected: true });
+// @ts-expect-error Telegram bot IDs remain numbers.
+const wrongBotId: string = issuedBot.id;
+// @ts-expect-error Telegram emulates no message commands in this slice.
+telegramStarted.services.tg.messages;
+const telegramEndpoint: string = telegramStarted.endpoints.tg.api;
+void botId;
+void botToken;
+void telegramManifest;
+void wrongBotId;
+void telegramEndpoint;
+await telegramStarted.dispose();
 const typedEnv = await Emulon.start({ services: { mail: fixture() } });
 const sent = await typedEnv.services.mail.emails.send({ to: "a@example.test" });
 const attached = await Emulon.connect({ config: { services: { mail: fixture() } } });

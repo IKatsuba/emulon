@@ -3,6 +3,7 @@ import { compatibility as stripeCompatibility } from '../packages/stripe/src/com
 import { compatibility as githubCompatibility } from '../packages/github/src/compatibility.ts';
 import { compatibility as polarCompatibility } from '../packages/polar/src/compatibility.ts';
 import { compatibility as resendCompatibility } from '../packages/resend/src/compatibility.ts';
+import { compatibility as telegramCompatibility } from '../packages/telegram/src/compatibility.ts';
 import type { CompatibilityManifest } from 'emulon';
 import { build, emptyDir } from '@deno/dnt';
 // Materialize the compiler package even on a machine with an empty Deno cache.
@@ -15,6 +16,7 @@ const manifests: Record<string, CompatibilityManifest> = {
   polar: polarCompatibility,
   resend: resendCompatibility,
   stripe: stripeCompatibility,
+  telegram: telegramCompatibility,
 };
 
 Deno.chdir(root);
@@ -33,7 +35,15 @@ const coreConfig = JSON.parse(
 );
 
 for (
-  const service of ['emulon', 'resend', 'github', 'stripe', 'calcom', 'polar']
+  const service of [
+    'emulon',
+    'resend',
+    'github',
+    'stripe',
+    'calcom',
+    'polar',
+    'telegram',
+  ]
 ) {
   const config = JSON.parse(
     await Deno.readTextFile(`packages/${service}/deno.json`),

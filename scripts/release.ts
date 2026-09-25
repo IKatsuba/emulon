@@ -8,7 +8,15 @@
  */
 
 const root = new URL('../', import.meta.url);
-const packages = ['emulon', 'resend', 'github', 'stripe', 'calcom', 'polar'];
+const packages = [
+  'emulon',
+  'resend',
+  'github',
+  'stripe',
+  'calcom',
+  'polar',
+  'telegram',
+];
 const cli = 'packages/emulon/src/cli/run.ts';
 const changelog = 'CHANGELOG.md';
 const semver = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;

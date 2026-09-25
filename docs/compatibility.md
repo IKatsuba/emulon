@@ -3,12 +3,13 @@
 The declarations in [GitHub](../packages/github/src/compatibility.ts),
 [Resend](../packages/resend/src/compatibility.ts),
 [Stripe](../packages/stripe/src/compatibility.ts),
-[Cal.com](../packages/calcom/src/compatibility.ts) and
-[Polar](../packages/polar/src/compatibility.ts) are the source for versioned,
-validated compatibility metadata. They describe the tested subset, including
-unsupported features and intentional provider differences. They contain no
-instance configuration or issued credentials. `/health` is a host probe, not a
-provider operation.
+[Cal.com](../packages/calcom/src/compatibility.ts),
+[Polar](../packages/polar/src/compatibility.ts) and
+[Telegram](../packages/telegram/src/compatibility.ts) are the source for
+versioned, validated compatibility metadata. They describe the tested subset,
+including unsupported features and intentional provider differences. They
+contain no instance configuration or issued credentials. `/health` is a host
+probe, not a provider operation.
 
 ```sh
 emulon github compatibility get --json

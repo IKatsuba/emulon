@@ -1,0 +1,17 @@
+{
+  "name": "@emulon/telegram",
+  "version": "0.1.2",
+  "exports": "./src/mod.ts",
+  "emulon": {
+    "apiVersion": 1,
+    "capabilities": [
+      "http",
+      "authorization",
+      "reset"
+    ]
+  },
+  "peerDependencies": {
+    "emulon": "0.1.2",
+    "hono": "4.13.8"
+  }
+}
