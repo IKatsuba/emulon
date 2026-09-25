@@ -1,5 +1,21 @@
 import type { MiddlewareHandler } from 'hono';
 
+/**
+ * Replaces a request's signal with one composed on first read. Deno warns once
+ * a native request signal is read, because it also aborts after a successful
+ * response, so only handlers that observe cancellation may touch it.
+ */
+function defineSignal(request: Request, compose: () => AbortSignal): Request {
+  let signal: AbortSignal | undefined;
+
+  Object.defineProperty(request, 'signal', {
+    configurable: true,
+    get: () => signal ??= compose(),
+  });
+
+  return request;
+}
+
 export function boundedBody(limit: number): MiddlewareHandler {
   return async (c, next) => {
     const request = c.req.raw;
@@ -39,21 +55,30 @@ export function boundedBody(limit: number): MiddlewareHandler {
         offset += chunk.length;
       }
 
-      c.req.raw = new Request(request.url, {
-        method: request.method,
-        headers: request.headers,
-        body,
-        signal: request.signal,
-      });
+      c.req.raw = defineSignal(
+        new Request(request.url, {
+          method: request.method,
+          headers: request.headers,
+          body,
+        }),
+        () => request.signal,
+      );
     }
 
     await next();
   };
 }
 
+/**
+ * Pause and close abort the host signal before waiting for admitted handlers,
+ * so a handler that waits on its request signal, such as a long poll, ends
+ * instead of holding up reset or shutdown. Handlers that ignore the signal
+ * still drain as before. Each resume starts a new signal for new requests.
+ */
 export function requestLifecycle() {
   let closed = false;
   let paused = false;
+  let host = new AbortController();
   const active = new Set<Promise<void>>();
   const middleware: MiddlewareHandler = async (c, next) => {
     if (closed || paused) {
@@ -68,6 +93,19 @@ export function requestLifecycle() {
     active.add(running);
 
     try {
+      const request = c.req.raw;
+      const native = Object.getPrototypeOf(request);
+      const admitted = host.signal;
+
+      defineSignal(
+        request,
+        () =>
+          AbortSignal.any([
+            Reflect.get(native, 'signal', request) as AbortSignal,
+            admitted,
+          ]),
+      );
+
       await next();
     } catch {
       return c.text('Internal server error', 500);
@@ -85,13 +123,21 @@ export function requestLifecycle() {
     async pause() {
       paused = true;
 
+      host.abort();
+
       await Promise.all([...active]);
     },
     resume() {
       paused = false;
+
+      if (host.signal.aborted && !closed) {
+        host = new AbortController();
+      }
     },
     close() {
       closed = true;
+
+      host.abort();
 
       return Promise.all([...active]).then(() => {});
     },

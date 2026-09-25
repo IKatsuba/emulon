@@ -268,7 +268,7 @@ export interface MessageView {
   entities?: MessageEntity[];
 }
 
-function chatView(channel: Channel): ChatView {
+export function chatView(channel: Channel): ChatView {
   return {
     id: channel.id,
     title: channel.title,
@@ -320,7 +320,7 @@ export async function findChannel(
 }
 
 /** Message IDs sort as text in store order and as numbers in the key. */
-const messageKey = (chatId: number, messageId: number) =>
+export const messageKey = (chatId: number, messageId: number): string =>
   `${chatId}:${String(messageId).padStart(16, '0')}`;
 
 const sequenceSchema = z.strictObject({

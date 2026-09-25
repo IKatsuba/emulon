@@ -18,6 +18,14 @@ project adheres to [Semantic Versioning](https://semver.org/).
   offsets, with per-chat monotone message IDs; malformed markup and text over
   4096 rendered units fail without writing. `messages list` shows the submitted
   and rendered text of a channel's messages.
+- `@emulon/telegram`: `getUpdates` with offset confirmation, `allowed_updates`
+  and real-time long polling drains `message_reaction_count` updates from a
+  durable per-bot queue. `reactions set` replaces the reaction counts of a
+  channel message and queues one update per subscribed bot; `updates inspect`
+  shows a queue without confirming it.
+- HTTP surfaces: reset and shutdown now abort the signal of admitted requests
+  before waiting for them to drain, so a handler waiting on `c.req.raw.signal`
+  ends promptly. A client disconnect aborts the same signal.
 - `@emulon/stripe`: products, one-time prices, coupons, promotion codes, hosted
   Checkout Sessions with a local payment page, payment intents, charges, refunds
   and disputes, with `checkout.session.completed`, `checkout.session.expired`,

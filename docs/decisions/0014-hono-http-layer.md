@@ -41,11 +41,14 @@ Before returning a surface the host installs:
    to downstream handlers.
 
 Pause waits for admitted requests, including body reads; resume admits new
-requests unless closed. Stop closes admission and listeners, aborts network
-connections, and waits for admitted middleware and handlers to finish before
-releasing ownership (ADR 0016). Tracking covers handler completion, not
-consumption of a streaming response. Plugins are trusted in-process code and
-must not replace host error handlers or otherwise bypass these facilities.
+requests unless closed. Pause and stop first abort the request signal of
+admitted handlers, which also follows a client disconnect
+([ADR 0037](0037-telegram-bot-api-polling-slice.md)). Stop closes admission and
+listeners, aborts network connections, and waits for admitted middleware and
+handlers to finish before releasing ownership (ADR 0016). Tracking covers
+handler completion, not consumption of a streaming response. Plugins are trusted
+in-process code and must not replace host error handlers or otherwise bypass
+these facilities.
 
 Deno uses the native server with `app.fetch`; Node uses `@hono/node-server`
 inside the runtime adapter. Both bind `127.0.0.1` on port 0. The old manual Node

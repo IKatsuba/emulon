@@ -52,6 +52,30 @@ export const compatibility: CompatibilityManifest = defineCompatibility({
         'telegram.messages.3',
       ],
     },
+    {
+      'id': 'getUpdates',
+      'method': 'POST',
+      'path': '/bot:token/getUpdates',
+      'surface': 'api',
+      'version': 'bot-api',
+      'auth': [
+        'local-bot-token-path',
+      ],
+      'input': [
+        'offset',
+        'limit',
+        'timeout',
+        'allowed_updates',
+      ],
+      'output':
+        'ok, result: update_id, message_reaction_count: chat, message_id, date, reactions',
+      'events': [],
+      'cases': [
+        'telegram.updates.1',
+        'telegram.updates.2',
+        'telegram.updates.3',
+      ],
+    },
   ],
   'versions': [
     {
@@ -104,7 +128,7 @@ export const compatibility: CompatibilityManifest = defineCompatibility({
     {
       'id': 'telegram.limitation.1',
       'description':
-        'Only getMe and sendMessage are implemented; every other method typed by @grammyjs/types@3.28.0, including getUpdates, setWebhook, deleteWebhook and getWebhookInfo, returns a 501 Bot API envelope',
+        'Only getMe, sendMessage and getUpdates are implemented; every other method typed by @grammyjs/types@3.28.0, including setWebhook, deleteWebhook and getWebhookInfo, returns a 501 Bot API envelope',
     },
     {
       'id': 'telegram.limitation.2',
@@ -146,6 +170,26 @@ export const compatibility: CompatibilityManifest = defineCompatibility({
       'description':
         'A link target without a scheme gets http://, and a target that is not a URL keeps its text without an entity; targets are normalized by the WHATWG URL parser, which can differ from Telegram in trailing slashes and percent-encoding',
     },
+    {
+      'id': 'telegram.limitation.10',
+      'description':
+        'getUpdates only ever returns message_reaction_count updates, produced by the reactions set command for configured channel messages; there are no users, per-user message_reaction updates, channel_post or other update types, and no provider method sets reactions',
+    },
+    {
+      'id': 'telegram.limitation.11',
+      'description':
+        'getUpdates accepts only offset, limit, timeout and allowed_updates as JSON numbers and a list of update type names typed by @grammyjs/types@3.28.0; a limit outside 1 to 100, a non-integer or negative timeout and an unknown update type return 400 instead of being clamped or ignored, and any other parameter returns 501',
+    },
+    {
+      'id': 'telegram.limitation.12',
+      'description':
+        'One getUpdates call per bot may run at a time; an overlapping call receives the 409 Conflict envelope instead of ending the earlier one. A poll cancelled by reset or shutdown receives a 503 envelope, never an empty batch',
+    },
+    {
+      'id': 'telegram.limitation.13',
+      'description':
+        'reactions set accepts the reaction emoji typed by @grammyjs/types@3.28.0, numeric custom emoji IDs and paid reactions, and orders counts by total_count, then paid, emoji and custom emoji, then by emoji or ID; Telegram does not document its order',
+    },
   ],
   'verification': {
     'mode': 'official-client',
@@ -167,6 +211,14 @@ export const compatibility: CompatibilityManifest = defineCompatibility({
           'telegram.messages.3',
         ],
       },
+      {
+        'path': 'packages/telegram/tests/update_cases.ts',
+        'cases': [
+          'telegram.updates.1',
+          'telegram.updates.2',
+          'telegram.updates.3',
+        ],
+      },
     ],
     'sources': [
       'https://core.telegram.org/bots/api',
@@ -175,6 +227,10 @@ export const compatibility: CompatibilityManifest = defineCompatibility({
       'https://core.telegram.org/bots/api#sendmessage',
       'https://core.telegram.org/bots/api#markdownv2-style',
       'https://core.telegram.org/bots/api#messageentity',
+      'https://core.telegram.org/bots/api#getting-updates',
+      'https://core.telegram.org/bots/api#getupdates',
+      'https://core.telegram.org/bots/api#messagereactioncountupdated',
+      'https://core.telegram.org/bots/api#reactioncount',
       'https://grammy.dev/ref/core/apiclientoptions',
     ],
     'retrieved': '2026-09-25',
@@ -189,6 +245,10 @@ export const compatibility: CompatibilityManifest = defineCompatibility({
       'fixtures.channels declares channels with a -100 prefixed negative ID, a title and a username unique without regard to case; bot usernames share that namespace.',
     'messages':
       'Every successful sendMessage allocates the next message_id of its chat in the transaction that stores the message, so IDs are gapless and monotone across bots, concurrent calls and durable restart; a failed send writes nothing. Malformed MarkdownV2 fails before the 4096 UTF-16 unit limit on rendered text. messages list returns the stored source and rendered text of up to the latest 100 messages of a channel, oldest first.',
+    'updates':
+      'Each bot has a durable queue with its own update IDs from 1 and a remembered allowed_updates. reactions set replaces the absolute counts of a message and, when they change, queues one message_reaction_count update for every bot subscribed at that moment, in the same transaction; an unchanged snapshot queues nothing and a reaction set before a bot subscribes never reaches it. A nonnegative offset confirms smaller IDs, a negative one keeps only the last updates, returning a batch confirms nothing, and updates inspect reads a queue without confirming it.',
+    'longPolling':
+      'A positive timeout waits that many seconds of real time, not the instance clock, and returns as soon as an update commits. A client disconnect ends the wait, and reset or shutdown ends it before waiting for requests to drain.',
     'transportLimit':
       'The host body limit answers oversized bodies with a plain 413 before the route runs, outside the Bot API envelope.',
   },

@@ -14,6 +14,20 @@ import {
   type StoredMessage,
   storedSchema,
 } from '../model/messages.ts';
+import {
+  type ReactionsInput,
+  reactionsInput,
+  type ReactionsResult,
+  reactionsResultSchema,
+  setReactions,
+} from '../model/reactions.ts';
+import {
+  type InspectInput,
+  inspectInput,
+  inspectUpdates,
+  type QueueView,
+  queueViewSchema,
+} from '../model/updates.ts';
 
 type Operation<I, O> = ReturnType<
   typeof defineCommand<z.ZodType<I, I>, z.ZodType<O, O>>
@@ -21,6 +35,8 @@ type Operation<I, O> = ReturnType<
 export type Commands = {
   'bots.create': Operation<CreateInput, IssuedBot>;
   'messages.list': Operation<ListInput, StoredMessage[]>;
+  'reactions.set': Operation<ReactionsInput, ReactionsResult>;
+  'updates.inspect': Operation<InspectInput, QueueView>;
 };
 
 export const commands: Commands = {
@@ -45,5 +61,31 @@ export const commands: Commands = {
       flags: { 'chat-id': 'chatId', limit: 'limit' },
     },
     execute: (ctx, input) => listMessages(ctx.store, input),
+  }),
+  'reactions.set': defineCommand({
+    description:
+      'Replace the absolute reaction counts of a channel message and queue one update per subscribed bot when they change',
+    input: reactionsInput,
+    output: reactionsResultSchema,
+    cli: {
+      path: ['reactions', 'set'],
+      flags: {
+        'chat-id': 'chatId',
+        'message-id': 'messageId',
+        reactions: 'reactions',
+      },
+    },
+    execute: (ctx, input) => setReactions(ctx.store, input, ctx.clock.now()),
+  }),
+  'updates.inspect': defineCommand({
+    description:
+      "Show a bot's pending updates and subscription without confirming them",
+    input: inspectInput,
+    output: queueViewSchema,
+    cli: {
+      path: ['updates', 'inspect'],
+      flags: { 'bot-id': 'botId', limit: 'limit' },
+    },
+    execute: (ctx, input) => inspectUpdates(ctx.store, input),
   }),
 };

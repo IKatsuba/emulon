@@ -536,7 +536,7 @@ Implemented, in delivery order:
 6. Implement the bounded Stripe and Cal.com slices in [ADR 0029](decisions/0029-stripe-initial-slice.md) and [ADR 0030](decisions/0030-calcom-initial-slice.md), using the shared compatibility manifest in [ADR 0028](decisions/0028-compatibility-manifest.md). [ADR 0031](decisions/0031-stripe-calcom-implementation-order.md) defines the implementation order and shared mechanics.
 7. Implement the bounded Polar customer and signed-delivery slice in [ADR 0033](decisions/0033-polar-initial-slice.md).
 8. Extend Stripe to catalog, discounts, hosted Checkout, refunds and disputes in [ADR 0035](decisions/0035-stripe-checkout-and-payments.md).
-9. Start the polling-only Telegram Bot API slice in [ADR 0037](decisions/0037-telegram-bot-api-polling-slice.md) with bots, token authentication, `getMe`, MarkdownV2 channel posts through `sendMessage` and `messages list`.
+9. Start the polling-only Telegram Bot API slice in [ADR 0037](decisions/0037-telegram-bot-api-polling-slice.md) with bots, token authentication, `getMe`, MarkdownV2 channel posts through `sendMessage` and `messages list`, and reaction counts drained with `getUpdates` long polling.
 
 Future work: S3, Upstash and CRM plugins.
 

@@ -1,6 +1,11 @@
 import telegram from '@emulon/telegram';
 import { Emulon } from 'emulon';
-import type { ApiMethods, UserFromGetMe } from 'grammy/types';
+import type {
+  ApiMethods,
+  ReactionTypeEmoji,
+  Update,
+  UserFromGetMe,
+} from 'grammy/types';
 import { verifyCoverage } from '../../emulon/tests/helpers/compatibility.ts';
 import { compatibility } from '../src/compatibility.ts';
 import {
@@ -27,11 +32,19 @@ import {
   knownMethod,
   knownMethods,
 } from '../src/routes/methods.ts';
+import { normalizeReactions } from '../src/model/reactions.ts';
+import {
+  reactionEmoji,
+  updatesRequest,
+  type UpdateType,
+  updateTypes,
+} from '../src/model/updates.ts';
 import { cases as botCases } from './bot_cases.ts';
 import { cases as messageCases } from './message_cases.ts';
+import { cases as updateCases } from './update_cases.ts';
 import { assert, equal, rejects } from './assert.ts';
 
-const cases = [...botCases, ...messageCases];
+const cases = [...botCases, ...messageCases, ...updateCases];
 
 verifyCoverage(compatibility, cases);
 
@@ -288,4 +301,120 @@ Deno.test('channel fixtures: -100 IDs, titles and case-insensitive usernames', a
       },
     })
   );
+});
+
+// The update types and reaction emoji must match the pinned client types.
+type TypedUpdate = Exclude<keyof Update, 'update_id'>;
+type TypedEmoji = ReactionTypeEmoji['emoji'];
+type Emoji = typeof reactionEmoji[number];
+
+const sameUpdates:
+  [Exclude<TypedUpdate, UpdateType>, Exclude<UpdateType, TypedUpdate>] extends
+    [never, never] ? true : false = true;
+const sameEmoji:
+  [Exclude<TypedEmoji, Emoji>, Exclude<Emoji, TypedEmoji>] extends
+    [never, never] ? true : false = true;
+
+Deno.test('update types and reaction emoji match the pinned client types', () => {
+  assert(sameUpdates && sameEmoji);
+  equal(new Set(updateTypes).size, updateTypes.length);
+  equal(new Set(reactionEmoji).size, reactionEmoji.length);
+});
+
+Deno.test('getUpdates parameters default, validate and deduplicate', () => {
+  equal(updatesRequest({}), { limit: 100, timeout: 0 });
+  equal(
+    updatesRequest({
+      offset: -3,
+      limit: 1,
+      timeout: 50,
+      allowed_updates: ['message_reaction_count', 'message_reaction_count'],
+    }),
+    {
+      offset: -3,
+      limit: 1,
+      timeout: 50,
+      allowedUpdates: ['message_reaction_count'],
+    },
+  );
+  equal(updatesRequest({ allowed_updates: [] }), {
+    limit: 100,
+    timeout: 0,
+    allowedUpdates: [],
+  });
+
+  for (
+    const [params, status] of [
+      [{ limit: 0 }, 400],
+      [{ limit: 100.5 }, 400],
+      [{ offset: Number.MAX_SAFE_INTEGER + 1 }, 400],
+      [{ offset: null }, 400],
+      [{ timeout: -1 }, 400],
+      [{ allowed_updates: {} }, 400],
+      [{ allowed_updates: ['update_id'] }, 400],
+      [{ allowed_updates: ['constructor'] }, 400],
+      [{ webhook: true }, 501],
+    ] as const
+  ) {
+    try {
+      updatesRequest(params);
+    } catch (error) {
+      equal((error as { status?: unknown }).status, status);
+
+      continue;
+    }
+
+    throw new Error(`Accepted ${JSON.stringify(params)}`);
+  }
+});
+
+Deno.test('reaction snapshots drop zero counts and sort deterministically', () => {
+  const emoji = (value: '👍' | '🔥', total_count: number) => ({
+    type: { type: 'emoji', emoji: value } as const,
+    total_count,
+  });
+  const custom = (id: string, total_count: number) => ({
+    type: { custom_emoji_id: id, type: 'custom_emoji' } as const,
+    total_count,
+  });
+  const paid = (total_count: number) => ({
+    type: { type: 'paid' } as const,
+    total_count,
+  });
+
+  equal(
+    normalizeReactions([
+      custom('9', 2),
+      emoji('🔥', 2),
+      paid(2),
+      custom('10', 2),
+      emoji('👍', 7),
+      custom('11', 0),
+    ]),
+    [emoji('👍', 7), paid(2), emoji('🔥', 2), custom('10', 2), custom('9', 2)],
+  );
+  equal(normalizeReactions([paid(0)]), []);
+  // Canonical key order, whatever order the caller used.
+  equal(
+    JSON.stringify(normalizeReactions([custom('1', 1)])),
+    '[{"type":{"type":"custom_emoji","custom_emoji_id":"1"},"total_count":1}]',
+  );
+
+  for (
+    const duplicate of [
+      [emoji('👍', 1), emoji('👍', 0)],
+      [paid(1), paid(2)],
+      [custom('1', 1), custom('1', 1)],
+    ]
+  ) {
+    try {
+      normalizeReactions(duplicate);
+    } catch (error) {
+      equal((error as { code?: unknown }).code, 'DUPLICATE_REACTION');
+
+      continue;
+    }
+
+    throw new Error('Accepted a duplicate reaction');
+  }
 });

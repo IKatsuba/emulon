@@ -150,3 +150,82 @@ Deno.test('surface registration and listener ownership reject invalid transition
 
   assert(rejected);
 });
+
+Deno.test('pause and stop abort the request signal before draining', async () => {
+  const host = httpContext();
+  const app = host.context.http.surface('api');
+  let entered!: () => void;
+  let started = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+
+  app.post('/wait', async (c) => {
+    const signal = c.req.raw.signal;
+    const body = await c.req.text();
+
+    entered();
+
+    await new Promise<void>((resolve) => {
+      signal.addEventListener('abort', () => resolve(), { once: true });
+    });
+
+    return c.text(`aborted ${body}`, 409);
+  });
+
+  app.get('/signal', (c) => c.text(String(c.req.raw.signal.aborted)));
+
+  const request = (path: string) =>
+    app.request(path, { method: 'POST', body: 'x' });
+
+  let waiting = request('/wait');
+
+  await started;
+  await host.pause();
+
+  const aborted = await waiting;
+
+  assert(aborted.status === 409 && await aborted.text() === 'aborted x');
+  host.resume();
+  // A new generation of requests starts with a live signal.
+  assert(await (await app.request('/signal')).text() === 'false');
+
+  started = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+
+  waiting = request('/wait');
+
+  await started;
+  await host.stop();
+  assert((await waiting).status === 409);
+});
+
+Deno.test('a caller abort reaches the handler signal', async () => {
+  const host = httpContext();
+  const app = host.context.http.surface('api');
+  const caller = new AbortController();
+  let observed!: (reason: string) => void;
+  const seen = new Promise<string>((resolve) => {
+    observed = resolve;
+  });
+
+  app.get('/wait', async (c) => {
+    await new Promise<void>((resolve) => {
+      c.req.raw.signal.addEventListener('abort', () => resolve(), {
+        once: true,
+      });
+      caller.abort();
+    });
+
+    observed('aborted');
+
+    return c.text('late');
+  });
+
+  const request = new Request('http://local/wait', { signal: caller.signal });
+
+  await Promise.resolve(app.fetch(request)).catch(() => {});
+
+  assert(await seen === 'aborted');
+  await host.stop();
+});

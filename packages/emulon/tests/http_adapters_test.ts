@@ -1,5 +1,6 @@
 import { serveDeno } from '../src/runtime/deno-http.ts';
 import { serveNode } from '../src/runtime/http.ts';
+import { httpContext } from '../src/plugins/http.ts';
 
 for (const serve of [serveDeno, serveNode]) {
   Deno.test(`${serve.name} preserves the request origin, path and query`, async () => {
@@ -59,6 +60,52 @@ for (const serve of [serveDeno, serveNode]) {
         throw new Error('Response cookies were lost or combined');
       }
     } finally {
+      await listener.stop();
+    }
+  });
+}
+
+for (const serve of [serveDeno, serveNode]) {
+  Deno.test(`${serve.name} aborts the host request signal when the client disconnects`, async () => {
+    const host = httpContext();
+    const app = host.context.http.surface('api');
+    let entered!: () => void;
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+
+    let aborted!: () => void;
+    const disconnected = new Promise<void>((resolve) => {
+      aborted = resolve;
+    });
+
+    app.post('/wait', async (c) => {
+      const signal = c.req.raw.signal;
+
+      await c.req.text();
+      signal.addEventListener('abort', () => aborted(), { once: true });
+      entered();
+      await disconnected;
+
+      return c.text('gone');
+    });
+
+    const listener = await serve(app.fetch);
+    const client = new AbortController();
+
+    try {
+      const request = fetch(`${listener.url}/wait`, {
+        method: 'POST',
+        body: 'x',
+        signal: client.signal,
+      }).catch(() => undefined);
+
+      await started;
+      client.abort();
+      await request;
+      await disconnected;
+    } finally {
+      await host.stop();
       await listener.stop();
     }
   });

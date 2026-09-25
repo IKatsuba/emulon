@@ -3,9 +3,10 @@
 A local Telegram Bot API for the polling-only slice selected in
 [ADR 0037](../../docs/decisions/0037-telegram-bot-api-polling-slice.md). The
 [compatibility manifest](src/compatibility.ts) is the authoritative tested
-scope. This release issues bots, authenticates their tokens, answers `getMe` and
-publishes plain or MarkdownV2 channel posts with `sendMessage`; every other
-method the pinned client types returns an explicit 501.
+scope. This release issues bots, authenticates their tokens, answers `getMe`,
+publishes plain or MarkdownV2 channel posts with `sendMessage` and delivers
+reaction counts through `getUpdates` polling; every other method the pinned
+client types returns an explicit 501.
 
 ```ts
 import { Emulon } from 'emulon';
@@ -46,6 +47,9 @@ instance `tg`:
 ```sh
 emulon tg bots create --username poster_bot --first-name Poster --json
 emulon tg messages list --chat-id -1001234567890 --limit 10 --json
+emulon tg reactions set --chat-id -1001234567890 --message-id 1 \
+  --reactions '[{"type":{"type":"emoji","emoji":"👍"},"total_count":3}]' --json
+emulon tg updates inspect --bot-id 7000000001 --json
 emulon tg compatibility get --json
 ```
 
@@ -88,6 +92,64 @@ calls and restarts.
 `messages list` (`messages.list`) takes a numeric `chatId` and an optional
 `limit` from 1 to 100 (default 100), and returns the most recent messages oldest
 first with the submitted `source`, `parseMode`, rendered `text` and `entities`.
+
+## Reaction polling
+
+A bot receives `message_reaction_count` updates only after it asks for them, as
+in Telegram: call `getUpdates` with
+`allowed_updates: ['message_reaction_count']` first. A reaction set before that
+never reaches the bot.
+
+```ts
+await bot.api.getUpdates({ allowed_updates: ['message_reaction_count'] });
+await env.services.tg.reactions.set({
+  chatId: -1001234567890,
+  messageId: post.message_id,
+  reactions: [{ type: { type: 'emoji', emoji: '👍' }, total_count: 3 }],
+});
+
+let offset: number | undefined;
+
+while (true) {
+  const updates = await bot.api.getUpdates({ offset, limit: 100, timeout: 0 });
+
+  if (updates.length === 0) {
+    break;
+  }
+
+  for (const update of updates) {
+    console.log(update.message_reaction_count?.reactions);
+  }
+
+  offset = updates.at(-1)!.update_id + 1;
+}
+```
+
+`reactions set` (`reactions.set`) replaces the absolute counts of a sent channel
+message with a list of Bot API `ReactionCount` objects: `emoji` reactions with
+one of the emoji the Bot API types, `custom_emoji` with a numeric ID, and
+`paid`, each at most once, with a nonnegative `total_count`. Zero counts are
+dropped. When the counts change, every bot subscribed at that moment gets one
+update with the chat, `message_id`, Unix `date` and the full `reactions` list,
+in the same transaction; setting the same counts again queues nothing. Counts
+are ordered by `total_count`, then paid, emoji and custom emoji.
+
+Each bot has its own durable queue with update IDs from 1. `getUpdates` takes
+`offset`, `limit` (1–100, default 100), `timeout` (seconds, default 0) and
+`allowed_updates`. A nonnegative offset confirms every smaller ID, a negative
+offset keeps only that many of the latest updates, and returning a batch
+confirms nothing. An omitted `allowed_updates` keeps the last list and an empty
+one restores Telegram's default, which leaves out reaction counts; a change
+never touches updates already queued. A positive `timeout` waits in real time
+and returns as soon as an update arrives. One `getUpdates` call per bot runs at
+a time; an overlapping call receives 409. Disconnecting ends a waiting poll, and
+reset or shutdown ends it with a 503 envelope rather than an empty batch.
+
+`updates inspect` (`updates.inspect`) takes a `botId` and an optional `limit`
+from 1 to 100, and returns the subscription, the number of pending updates and
+the oldest ones, without confirming anything or showing a token.
+
+## Envelopes
 
 Responses are Bot API envelopes: `{ "ok": true, "result": ... }` on success and
 `{ "ok": false, "error_code": ..., "description": ... }` with the same HTTP

@@ -269,3 +269,55 @@ publishing part. They add no provider operation beyond this ADR.
   cannot mix string and number values, and an optional `limit` of 1–100 (default
   100). It returns the most recent messages oldest first, so a recent multipart
   post always reads whole and in order.
+
+## Addendum: reaction polling decisions
+
+These choices were open inside the scope above and are settled by the reaction
+polling part. They add no provider operation beyond this ADR.
+
+- **Reaction input.** `reactions.set` takes `chatId`, `messageId` and
+  `reactions`, a list of at most 100 Bot API `ReactionCount` objects, so the CLI
+  JSON flag, the SDK input and the update payload share one shape with
+  `total_count`. `emoji` accepts the reaction emoji typed by
+  `@grammyjs/types@3.28.0`, `custom_emoji_id` is a decimal ID, and a type listed
+  twice fails with `DUPLICATE_REACTION`; an unknown chat or message fails with
+  `CHAT_NOT_FOUND` or `MESSAGE_NOT_FOUND` before anything is written. The result
+  is `{ chatId, messageId, reactions, changed, queued }`, where `queued` counts
+  the bots that received an update. Telegram does not document the order of
+  `reactions`; the emulator orders by `total_count` descending, then paid, emoji
+  and custom emoji, then by emoji or ID as text.
+- **Queue identity.** Each bot's update IDs start at 1 and survive durable
+  restart with its queue and subscription; reset removes all three with the bot.
+  The update `date` comes from the instance clock like a message date, while the
+  long-poll wait uses real time.
+- **Parameters.** `getUpdates` reads JSON numbers only. A `limit` outside 1–100,
+  a non-integer offset, a negative or non-integer timeout, and an
+  `allowed_updates` that is not a list of update type names typed by the pinned
+  client fail with 400 and change nothing; Telegram clamps some of these, and
+  clamping would hide a caller mistake. Any other parameter returns 501.
+- **One reader.** The 409 envelope, with Telegram's
+  `Conflict: terminated by other getUpdates request; make sure that only one bot
+  instance is running`
+  description, answers every `getUpdates` call that overlaps a running one for
+  the same bot, including a zero-timeout call. The running call continues;
+  Telegram would instead end the older one.
+- **Cancellation.** A poll ended by reset or shutdown answers with a 503
+  envelope, `Service Unavailable: the request was cancelled`, which grammY
+  treats as a retryable failure; a disconnected client receives nothing.
+- **Queue inspection.** `updates.inspect` returns
+  `{ botId, allowedUpdates, pending, updates }`: the subscription as stored (an
+  empty list is the default), the number of queued updates and the oldest
+  `limit` of them (1–100, default 100) in the Bot API `Update` shape. An unknown
+  bot fails with `BOT_NOT_FOUND`.
+- **Host signal.** The lifecycle middleware replaces `c.req.raw.signal` with a
+  signal composed on first read from the incoming request signal and the host
+  signal current at admission. Pause and close abort the host signal before
+  waiting for admitted handlers; resume starts a new one. The body middleware
+  keeps that signal when it buffers the body. Composition is lazy because Deno
+  prints a notice about its legacy request-signal behavior once anything reads a
+  native request signal; only handlers that observe cancellation now read it.
+- **Disconnect proof.** Tests and the installed proof disconnect a poller by
+  resetting a raw socket. An aborted Deno `fetch` can be sent again on a fresh
+  connection, and Deno's server does not always report a client that only
+  half-closes its socket during a poll; such a poll ends at its timeout, reset
+  or shutdown instead of at once.

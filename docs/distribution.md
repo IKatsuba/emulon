@@ -188,18 +188,22 @@ UTC-only attendees. See [the package guide](../packages/calcom/README.md) and
 [installed contract proof](../scripts/calcom-proof.ts). No Cal.com client or
 React dependency is shipped.
 
-## Telegram bot foundation
+## Telegram Bot API
 
 The build also publishes `@emulon/telegram`. Offline installed Node and Deno
 consumers start an instance with one fixture channel, issue a bot through the
 SDK and call `getMe` and `sendMessage` with the requests grammY sends. A
 MarkdownV2 post reaches the channel by ID and by `@username` with consecutive
 message IDs, unescaped markup receives the 400 envelope, and `messages list`
-returns both posts. A wrong token receives the 401 envelope, a malformed one
-404, `setWebhook` 501 and an unknown method 404; after reset the old token fails
-even though the next bot reuses its ID. The manifest matches npm metadata and
-the installed command. See [the package guide](../packages/telegram/README.md)
-and the [installed proof](../scripts/telegram-proof.ts). `grammy@1.44.0` and
+returns both posts. The bot subscribes to reaction counts, drains an update set
+through `reactions set` and confirms it by offset; a long poll wakes on the next
+reaction, an overlapping poll receives 409, and a disconnected, reset or
+shut-down poll ends at once, reset with the 503 envelope, on each runtime's own
+listener. A wrong token receives the 401 envelope, a malformed one 404,
+`setWebhook` 501 and an unknown method 404; after reset the old token fails even
+though the next bot reuses its ID. The manifest matches npm metadata and the
+installed command. See [the package guide](../packages/telegram/README.md) and
+the [installed proof](../scripts/telegram-proof.ts). `grammy@1.44.0` and
 `md-to-telegram@0.1.1` are development-only imports and are never shipped or
 packed for consumers.
 

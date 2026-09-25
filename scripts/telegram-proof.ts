@@ -1,13 +1,15 @@
 import { compatibility } from '../packages/telegram/src/compatibility.ts';
 
 /**
- * Bot foundation smoke for the installed archive: no workspace imports, no
- * grammY and no provider access. The requests are the ones grammY sends: POST
- * `<apiRoot>/bot<token>/<method>` with a JSON body.
+ * Telegram smoke for the installed archive: no workspace imports, no grammY
+ * and no provider access. The requests are the ones grammY sends: POST
+ * `<apiRoot>/bot<token>/<method>` with a JSON body. Long polls run on the
+ * runtime's own listener, so cancellation is proven under Node and Deno.
  */
 export function telegramProof(prefix: string): string {
   return `
 import { readFile } from "node:fs/promises";
+import { connect } from "node:net";
 import { Emulon, defineCompatibility } from "${prefix}emulon";
 import telegram from "${prefix}@emulon/telegram";
 const manifest = ${JSON.stringify(compatibility)};
@@ -27,9 +29,9 @@ try {
   assert(!apiRoot.endsWith("/"), "Endpoint has a trailing slash");
   const bot = await env.services.tg.bots.create({ username: "installed_bot", firstName: "Installed" });
   assert(/^\\d+:[A-Za-z0-9_-]{43}$/.test(bot.token) && bot.token.startsWith(bot.id + ":"), "Unexpected token shape");
-  const call = async (token, method, body = {}) => {
+  const call = async (token, method, body = {}, signal) => {
     const response = await fetch(apiRoot + "/bot" + token + "/" + method, {
-      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal,
     });
     const text = await response.text();
     assert(!text.includes(bot.token.split(":")[1]), "Token reached a response");
@@ -51,7 +53,45 @@ try {
   equal(sent.map((message) => [message.message_id, message.chat.id, message.text, message.entities]), [1, 2].map((id) => [id, channel.id, "Part 1.", [{ type: "bold", offset: 0, length: 4 }]]), "sendMessage result");
   equal(await call(bot.token, "sendMessage", { chat_id: channel.id, text: "Unescaped.", parse_mode: "MarkdownV2" }), { status: 400, body: { ok: false, error_code: 400, description: "Bad Request: can't parse entities" } }, "bad markup");
   equal((await env.services.tg.messages.list({ chatId: channel.id })).map((message) => [message.messageId, message.source, message.text]), [[1, "*Part* 1\\\\.", "Part 1."], [2, "*Part* 1\\\\.", "Part 1."]], "messages list");
+  const thumbs = (total_count) => [{ type: { type: "emoji", emoji: "👍" }, total_count }];
+  const react = (count) => env.services.tg.reactions.set({ chatId: channel.id, messageId: 1, reactions: thumbs(count) });
+  equal((await react(1)).queued, 0, "reaction before subscription");
+  equal((await call(bot.token, "getUpdates", { allowed_updates: ["message_reaction_count"] })).body, { ok: true, result: [] }, "subscription");
+  equal((await react(2)).queued, 1, "subscribed reaction");
+  equal((await env.services.tg.updates.inspect({ botId: bot.id })).pending, 1, "updates inspect");
+  const drained = await call(bot.token, "getUpdates", { limit: 100, timeout: 0 });
+  equal(drained.body.result.map((update) => [update.update_id, update.message_reaction_count.chat.id, update.message_reaction_count.chat.username, update.message_reaction_count.message_id, update.message_reaction_count.reactions]), [[1, channel.id, "local_news", 1, thumbs(2)]], "drained update");
+  equal((await call(bot.token, "getUpdates", { offset: 2, timeout: 0 })).body.result, [], "confirmed drain");
+  const pause = () => new Promise((resolve) => setTimeout(resolve, 200));
+  let started = performance.now();
+  const woken = call(bot.token, "getUpdates", { timeout: 30 });
+  await pause();
+  equal((await call(bot.token, "getUpdates", {})).status, 409, "overlapping poll");
+  await react(3);
+  equal((await woken).body.result.map((update) => update.update_id), [2], "woken poll");
+  assert(performance.now() - started < 5000, "Long poll did not wake");
+  // A reset socket is an exact disconnect; an aborted fetch may be resent.
+  const url = new URL(apiRoot);
+  const socket = connect({ host: url.hostname, port: Number(url.port) });
+  await new Promise((resolve, reject) => { socket.once("connect", resolve); socket.once("error", reject); });
+  socket.on("error", () => {});
+  const pollBody = JSON.stringify({ offset: 3, timeout: 30 });
+  socket.write("POST /bot" + bot.token + "/getUpdates HTTP/1.1\\r\\nhost: " + url.host + "\\r\\ncontent-type: application/json\\r\\ncontent-length: " + new TextEncoder().encode(pollBody).length + "\\r\\n\\r\\n" + pollBody);
+  await pause();
+  equal((await call(bot.token, "getUpdates", {})).status, 409, "socket poll is waiting");
+  socket.resetAndDestroy();
+  let released;
+  for (let attempt = 0; attempt < 100 && released?.status !== 200; attempt++) {
+    released = await call(bot.token, "getUpdates", { timeout: 0 });
+    if (released.status !== 200) await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  equal(released.body, { ok: true, result: [] }, "poll after disconnect");
+  started = performance.now();
+  const resetting = call(bot.token, "getUpdates", { timeout: 30 });
+  await pause();
   await env.reset();
+  equal(await resetting, { status: 503, body: { ok: false, error_code: 503, description: "Service Unavailable: the request was cancelled" } }, "poll across reset");
+  assert(performance.now() - started < 5000, "Reset waited for the poll");
   equal((await call(bot.token, "getMe")).status, 401, "token after reset");
   const again = await env.services.tg.bots.create({ username: "installed_bot", firstName: "Again" });
   equal(again.id, bot.id, "reused ID");
@@ -60,6 +100,17 @@ try {
 } finally {
   await env.dispose();
 }
-console.log("Telegram installed getMe, sendMessage, messages list, token rejection, 501 methods, reset and manifest parity passed");
+const stopped = await Emulon.start({ services: { tg: telegram({ fixtures: { channels: [channel] } }) } });
+const stopBot = await stopped.services.tg.bots.create({ username: "stopping_bot", firstName: "Stopping" });
+const stopping = fetch(stopped.endpoints.tg.api + "/bot" + stopBot.token + "/getUpdates", {
+  method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ timeout: 30 }),
+}).then(async (response) => (await response.json()).error_code, () => "network");
+await new Promise((resolve) => setTimeout(resolve, 200));
+const stopStarted = performance.now();
+await stopped.dispose();
+const stopOutcome = await stopping;
+assert(stopOutcome === 503 || stopOutcome === "network", "Shutdown answered the poll with " + stopOutcome);
+assert(performance.now() - stopStarted < 5000, "Shutdown waited for the poll");
+console.log("Telegram installed getMe, sendMessage, messages list, reactions, getUpdates, long poll cancellation, token rejection, 501 methods, reset and manifest parity passed");
 `;
 }

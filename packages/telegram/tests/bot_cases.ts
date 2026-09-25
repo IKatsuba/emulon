@@ -430,7 +430,7 @@ register(
     );
     equal(await grammyFailure(() => bot.api.deleteWebhook(), secrets), method);
     equal(await grammyFailure(() => bot.api.getWebhookInfo(), secrets), method);
-    equal(await grammyFailure(() => bot.api.getUpdates(), secrets), method);
+    equal(await grammyFailure(() => bot.api.logOut(), secrets), method);
     equal(
       await grammyFailure(
         () => bot.api.forwardMessage(channel.id, channel.id, 1),
@@ -541,7 +541,7 @@ register(
 
     // A known method is refused before its transport is considered.
     equal(
-      await envelope(await fetch(`${api}/bot${token}/getUpdates`), secrets),
+      await envelope(await fetch(`${api}/bot${token}/forwardMessage`), secrets),
       { status: 501, body: { ok: false, ...method } },
     );
   },

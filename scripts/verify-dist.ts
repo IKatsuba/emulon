@@ -534,7 +534,7 @@ console.log("STATE_IN_USE before instance preparation");
     });
     await Deno.writeTextFile(`${cwd}/telegram.mjs`, telegramProof(prefix));
     await run(
-      'installed Telegram bot foundation',
+      'installed Telegram Bot API',
       runtime === 'Node' ? 'node' : Deno.execPath(),
       runtime === 'Node' ? ['telegram.mjs'] : [...denoArgs, 'telegram.mjs'],
     );
@@ -1420,13 +1420,21 @@ const listedText: string | undefined = listedMessages[0]?.text;
 const listedEntityOffset: number | undefined = listedMessages[0]?.entities[0]?.offset;
 // @ts-expect-error Telegram message listing takes a numeric channel ID.
 telegramStarted.services.tg.messages.list({ chatId: "@local_news" });
-// @ts-expect-error Telegram emulates no reaction commands in this slice.
-telegramStarted.services.tg.reactions;
+const reacted = await telegramStarted.services.tg.reactions.set({ chatId: -1001234567890, messageId: 1, reactions: [{ type: { type: "emoji", emoji: "👍" }, total_count: 1 }, { type: { type: "paid" }, total_count: 2 }] }).catch(() => undefined);
+const reactedQueued: number | undefined = reacted?.queued;
+// @ts-expect-error Reaction counts use the Bot API total_count field.
+telegramStarted.services.tg.reactions.set({ chatId: -1001234567890, messageId: 1, reactions: [{ type: { type: "paid" }, totalCount: 1 }] }).catch(() => undefined);
+const inspectedQueue = await telegramStarted.services.tg.updates.inspect({ botId, limit: 100 });
+const queuedUpdateId: number | undefined = inspectedQueue.updates[0]?.update_id;
+// @ts-expect-error Queue inspection takes a numeric bot ID, never a token.
+telegramStarted.services.tg.updates.inspect({ botId: botToken });
 const telegramEndpoint: string = telegramStarted.endpoints.tg.api;
 void botId;
 void botToken;
 void listedText;
 void listedEntityOffset;
+void reactedQueued;
+void queuedUpdateId;
 void telegramManifest;
 void wrongBotId;
 void telegramEndpoint;

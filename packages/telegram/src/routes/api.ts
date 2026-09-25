@@ -3,6 +3,12 @@ import type { PluginContext } from 'emulon';
 import { parseToken } from '../auth/tokens.ts';
 import { authenticate, type Bot, botUser } from '../model/bots.ts';
 import { SendError, sendMessage, sendRequest } from '../model/messages.ts';
+import {
+  pollUpdates,
+  UpdatesError,
+  updatesErrors,
+  updatesRequest,
+} from '../model/updates.ts';
 import { type KnownMethod, knownMethod } from './methods.ts';
 
 /**
@@ -35,7 +41,8 @@ export function success(result: unknown): Response {
 }
 
 export function failure(error: unknown): Response {
-  const known = error instanceof BotApiError || error instanceof SendError
+  const known = error instanceof BotApiError || error instanceof SendError ||
+      error instanceof UpdatesError
     ? error
     : new BotApiError(500, 'Internal Server Error');
 
@@ -64,7 +71,13 @@ export function isJson(contentType: string | null): boolean {
 type Handler = (
   params: Record<string, unknown>,
   bot: Bot,
-  request: { store: PluginContext['store']; now: number },
+  request: {
+    store: PluginContext['store'];
+    now: number;
+    /** Read only by handlers that wait; see the host request lifecycle. */
+    signal: () => AbortSignal;
+    polling: Set<number>;
+  },
 ) => unknown;
 
 const handlers: Partial<Record<KnownMethod, Handler>> = {
@@ -77,6 +90,22 @@ const handlers: Partial<Record<KnownMethod, Handler>> = {
   },
   sendMessage(params, bot, { store, now }) {
     return sendMessage(store, bot, sendRequest(params), now);
+  },
+  async getUpdates(params, bot, { store, signal, polling }) {
+    const request = updatesRequest(params);
+
+    // A second reader would race the first for confirmations.
+    if (polling.has(bot.id)) {
+      throw updatesErrors.conflict();
+    }
+
+    polling.add(bot.id);
+
+    try {
+      return await pollUpdates(store, bot.id, request, signal());
+    } finally {
+      polling.delete(bot.id);
+    }
   },
 };
 
@@ -107,6 +136,8 @@ async function params(request: Request): Promise<Record<string, unknown>> {
  * unsupported method reveals nothing to a caller without a valid token.
  */
 export function routes(ctx: PluginContext, api: Hono) {
+  const polling = new Set<number>();
+
   api.all('*', async (c) => {
     const store = ctx.store.scope();
 
@@ -140,6 +171,8 @@ export function routes(ctx: PluginContext, api: Hono) {
         await handler(await params(c.req.raw), bot, {
           store,
           now: ctx.clock.now(),
+          signal: () => c.req.raw.signal,
+          polling,
         }),
       );
     } catch (error) {
