@@ -202,12 +202,16 @@ shut-down poll ends at once, reset with the 503 envelope, on each runtime's own
 listener. A wrong token receives the 401 envelope, a malformed one 404,
 `setWebhook` 501 and an unknown method 404; after reset the old token fails even
 though the next bot reuses its ID. The manifest matches npm metadata and the
-installed command. A project host then runs the declared consumer's loop: a
-first `getUpdates` without an offset, a two-part post by ID and `@username` with
-the consumer's send options, reactions set through the installed CLI and the
+installed command. A separate project then installs the archives offline,
+configures `telegram()` with the channel in `emulon.config.ts` and starts a
+foreground `emulon up` through the installed binary (`npx emulon` under Node,
+`npm:emulon` under Deno). Its consumer runs the declared loop: a first
+`getUpdates` without an offset, a two-part post by ID and `@username` with the
+consumer's send options, reactions set through the installed CLI binary and the
 connected SDK, and a drain with `limit: 100`, `timeout: 0` and `allowed_updates`
-until an empty batch, after which the stored offset reads nothing. The CLI and
-SDK agree on the manifest, `messages list` and `updates inspect`. See
+until an empty batch, after which the stored offset reads nothing and
+`emulon down` stops the host. The CLI and SDK agree on the manifest,
+`messages list` and `updates inspect`. See
 [the package guide](../packages/telegram/README.md) and the
 [installed proof](../scripts/telegram-proof.ts). `grammy@1.44.0` and
 `md-to-telegram@0.1.1` are development-only imports and are never shipped or

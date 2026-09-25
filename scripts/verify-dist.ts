@@ -8,7 +8,7 @@ import {
 import ts from 'typescript';
 import { managerProof } from './manager-proof.ts';
 import { polarAcceptance, polarProof } from './polar-proof.ts';
-import { telegramProof } from './telegram-proof.ts';
+import { telegramAcceptance, telegramProof } from './telegram-proof.ts';
 import { addProof } from './add-proof.ts';
 import { durableProof } from './durable-proof.ts';
 import { withoutTypeStrippingNotice } from './runtime-warnings.ts';
@@ -539,6 +539,14 @@ console.log("STATE_IN_USE before instance preparation");
       runtime === 'Node' ? 'node' : Deno.execPath(),
       runtime === 'Node' ? ['telegram.mjs'] : [...denoArgs, 'telegram.mjs'],
     );
+    await telegramAcceptance({
+      cwd,
+      archiveDirectory: temporary,
+      env,
+      runtime,
+      denoArgs,
+      archives,
+    });
     await Deno.writeTextFile(`${cwd}/calcom.mjs`, calcomProof(prefix));
     await run(
       'installed Cal.com contract',
