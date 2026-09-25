@@ -226,7 +226,7 @@ Deno.test('MarkdownV2 links resolve their targets like Telegram', () => {
 Deno.test('MarkdownV2 block quotations', () => {
   equal(parse('>one\n>two *b*\nafter'), {
     text: 'one\ntwo b\nafter',
-    entities: [e('blockquote', 0, 9), e('bold', 8, 1)],
+    entities: [e('blockquote', 0, 10), e('bold', 8, 1)],
   });
   equal(parse('before\n>quote'), {
     text: 'before\nquote',
@@ -236,9 +236,35 @@ Deno.test('MarkdownV2 block quotations', () => {
   equal(parse('>plain\n**>hidden\n>more||\ntail'), {
     text: 'plain\nhidden\nmore\ntail',
     entities: [
-      e('blockquote', 0, 5),
-      e('expandable_blockquote', 6, 11),
+      e('blockquote', 0, 6),
+      e('expandable_blockquote', 6, 12),
     ],
+  });
+  // The newline ending a quotation belongs to it (TDLib's own cases).
+  equal(parse('>*abcd*\n'), {
+    text: 'abcd\n',
+    entities: [e('blockquote', 0, 5), e('bold', 0, 4)],
+  });
+  equal(parse('>\n1'), {
+    text: '\n1',
+    entities: [e('blockquote', 0, 1)],
+  });
+  equal(parse('>\n**>2'), {
+    text: '\n2',
+    entities: [e('blockquote', 0, 1), e('blockquote', 1, 1)],
+  });
+  equal(parse('>asd\n>q||e||w||\nasdad'), {
+    text: 'asd\nqew\nasdad',
+    entities: [e('expandable_blockquote', 0, 8), e('spoiler', 5, 1)],
+  });
+  equal(parse('>asd\n>q||ew||\nasdad'), {
+    text: 'asd\nqew\nasdad',
+    entities: [e('blockquote', 0, 8), e('spoiler', 5, 2)],
+  });
+  // `||` ends the expandable quotation even before another quoted line.
+  equal(parse('**>a||\n>b'), {
+    text: 'a\nb',
+    entities: [e('expandable_blockquote', 0, 2), e('blockquote', 2, 1)],
   });
   equal(parse('>a ||s||'), {
     text: 'a s',

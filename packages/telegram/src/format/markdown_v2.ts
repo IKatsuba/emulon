@@ -55,6 +55,7 @@ interface Open {
 interface Quote {
   offset: number;
   order: number;
+  expandable: boolean;
 }
 
 /** Any character from 1 to 126 may follow a backslash to stand for itself. */
@@ -110,13 +111,13 @@ export function parseMarkdownV2(source: string): ParsedText {
   };
 
   // Entities opened inside a quotation must close inside it.
-  const closeQuote = (expandable: boolean) => {
+  const closeQuote = () => {
     if (open.length > 0) {
       throw new MarkdownError();
     }
 
     push({
-      type: expandable ? 'expandable_blockquote' : 'blockquote',
+      type: quote!.expandable ? 'expandable_blockquote' : 'blockquote',
       offset: quote!.offset,
       length: text.length - quote!.offset,
     }, quote!.order);
@@ -151,7 +152,7 @@ export function parseMarkdownV2(source: string): ParsedText {
           throw new MarkdownError();
         }
 
-        quote ??= { offset: text.length, order: order++ };
+        quote ??= { offset: text.length, order: order++, expandable: false };
         i += marker - 1;
 
         continue;
@@ -159,20 +160,20 @@ export function parseMarkdownV2(source: string): ParsedText {
     }
 
     if (c === '\n') {
-      if (quote) {
-        if (inCode) {
-          // Code spanning quoted lines would need prefix rules Telegram
-          // does not document; refuse instead of guessing them.
-          throw new MarkdownError();
-        }
-
-        if (source[i + 1] !== '>') {
-          closeQuote(false);
-        }
+      if (quote && inCode) {
+        // Code spanning quoted lines would need prefix rules Telegram
+        // does not document; refuse instead of guessing them.
+        throw new MarkdownError();
       }
 
       text += c;
       lineStart = true;
+
+      // A quotation ends with the newline that ends its last line, so the
+      // newline belongs to it; `||` ends the line after it marked.
+      if (quote && (quote.expandable || source[i + 1] !== '>')) {
+        closeQuote();
+      }
 
       continue;
     }
@@ -188,7 +189,8 @@ export function parseMarkdownV2(source: string): ParsedText {
       quote && c === '|' && source[i + 1] === '|' && top?.type !== 'spoiler' &&
       (i + 2 === source.length || source[i + 2] === '\n')
     ) {
-      closeQuote(true);
+      quote.expandable = true;
+
       i++;
 
       continue;
@@ -350,7 +352,7 @@ export function parseMarkdownV2(source: string): ParsedText {
   }
 
   if (quote) {
-    closeQuote(false);
+    closeQuote();
   }
 
   // Outer entities first: by offset, then longer first, then opening order.

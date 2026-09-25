@@ -246,15 +246,15 @@ publishing part. They add no provider operation beyond this ADR.
   block quotations and `**>…||` expandable block quotations. It follows the
   TDLib parser's single pass: `__` binds greedily, empty entities are dropped,
   entities nest only by containment, links cannot contain links, and a quotation
-  cannot start inside another entity or be left with one open. A quotation is
-  expandable when its last line ends in `||` outside a spoiler. Custom emoji,
-  date-time entities, `tg://` mentions and non-HTTP link schemes are refused
-  with `can't parse entities` instead of being rendered differently, as is code
-  spanning quoted lines, whose prefix rules are undocumented. Link targets
-  without a scheme get `http://`; a target that is not a URL keeps its text
-  without an entity, as Telegram does. Telegram's automatic URL, mention and
-  hashtag entities and its whitespace trimming are not emulated. Each limit is a
-  manifest limitation.
+  cannot start inside another entity or be left with one open. A quotation
+  includes the newline that ends its last line and is expandable when that line
+  ends in `||` outside a spoiler. Custom emoji, date-time entities, `tg://`
+  mentions and non-HTTP link schemes are refused with `can't parse entities`
+  instead of being rendered differently, as is code spanning quoted lines, whose
+  prefix rules are undocumented. Link targets without a scheme get `http://`; a
+  target that is not a URL keeps its text without an entity, as Telegram does.
+  Telegram's automatic URL, mention and hashtag entities and its whitespace
+  trimming are not emulated. Each limit is a manifest limitation.
 - **Validation order.** Unsupported fields are refused first (501), then the
   chat is resolved (400 `chat not found`), then the text is parsed (400
   `can't parse entities`), then an empty result (400 `message text is empty`)
