@@ -2,6 +2,7 @@ import type { Hono } from 'hono';
 import type { PluginContext } from 'emulon';
 import { parseToken } from '../auth/tokens.ts';
 import { authenticate, type Bot, botUser } from '../model/bots.ts';
+import { SendError, sendMessage, sendRequest } from '../model/messages.ts';
 import { type KnownMethod, knownMethod } from './methods.ts';
 
 /**
@@ -34,7 +35,7 @@ export function success(result: unknown): Response {
 }
 
 export function failure(error: unknown): Response {
-  const known = error instanceof BotApiError
+  const known = error instanceof BotApiError || error instanceof SendError
     ? error
     : new BotApiError(500, 'Internal Server Error');
 
@@ -60,7 +61,11 @@ export function isJson(contentType: string | null): boolean {
     'application/json';
 }
 
-type Handler = (params: Record<string, unknown>, bot: Bot) => unknown;
+type Handler = (
+  params: Record<string, unknown>,
+  bot: Bot,
+  request: { store: PluginContext['store']; now: number },
+) => unknown;
 
 const handlers: Partial<Record<KnownMethod, Handler>> = {
   getMe(params, bot) {
@@ -69,6 +74,9 @@ const handlers: Partial<Record<KnownMethod, Handler>> = {
     }
 
     return botUser(bot);
+  },
+  sendMessage(params, bot, { store, now }) {
+    return sendMessage(store, bot, sendRequest(params), now);
   },
 };
 
@@ -128,7 +136,12 @@ export function routes(ctx: PluginContext, api: Hono) {
         throw unsupportedMethod();
       }
 
-      return success(await handler(await params(c.req.raw), bot));
+      return success(
+        await handler(await params(c.req.raw), bot, {
+          store,
+          now: ctx.clock.now(),
+        }),
+      );
     } catch (error) {
       return failure(error);
     }

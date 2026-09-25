@@ -1415,11 +1415,18 @@ telegram({ fixtures: { channels: [{ id: "-1001234567890", title: "News", usernam
 telegram({ unexpected: true });
 // @ts-expect-error Telegram bot IDs remain numbers.
 const wrongBotId: string = issuedBot.id;
-// @ts-expect-error Telegram emulates no message commands in this slice.
-telegramStarted.services.tg.messages;
+const listedMessages = await telegramStarted.services.tg.messages.list({ chatId: -1001234567890, limit: 10 });
+const listedText: string | undefined = listedMessages[0]?.text;
+const listedEntityOffset: number | undefined = listedMessages[0]?.entities[0]?.offset;
+// @ts-expect-error Telegram message listing takes a numeric channel ID.
+telegramStarted.services.tg.messages.list({ chatId: "@local_news" });
+// @ts-expect-error Telegram emulates no reaction commands in this slice.
+telegramStarted.services.tg.reactions;
 const telegramEndpoint: string = telegramStarted.endpoints.tg.api;
 void botId;
 void botToken;
+void listedText;
+void listedEntityOffset;
 void telegramManifest;
 void wrongBotId;
 void telegramEndpoint;

@@ -27,8 +27,11 @@ import {
   knownMethod,
   knownMethods,
 } from '../src/routes/methods.ts';
-import { cases } from './bot_cases.ts';
+import { cases as botCases } from './bot_cases.ts';
+import { cases as messageCases } from './message_cases.ts';
 import { assert, equal, rejects } from './assert.ts';
+
+const cases = [...botCases, ...messageCases];
 
 verifyCoverage(compatibility, cases);
 

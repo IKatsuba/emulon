@@ -433,7 +433,7 @@ register(
     equal(await grammyFailure(() => bot.api.getUpdates(), secrets), method);
     equal(
       await grammyFailure(
-        () => bot.api.sendMessage(channel.id, 'Not yet'),
+        () => bot.api.forwardMessage(channel.id, channel.id, 1),
         secrets,
       ),
       method,
@@ -541,7 +541,7 @@ register(
 
     // A known method is refused before its transport is considered.
     equal(
-      await envelope(await fetch(`${api}/bot${token}/sendMessage`), secrets),
+      await envelope(await fetch(`${api}/bot${token}/getUpdates`), secrets),
       { status: 501, body: { ok: false, ...method } },
     );
   },

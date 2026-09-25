@@ -20,7 +20,8 @@
     "stripe": "npm:stripe@22.1.1",
     "stripe-basil": "npm:stripe@18.0.0",
     "@polar-sh/sdk": "npm:@polar-sh/sdk@0.49.0",
-    "grammy": "npm:grammy@1.44.0"
+    "grammy": "npm:grammy@1.44.0",
+    "md-to-telegram": "npm:md-to-telegram@0.1.1"
   },
   "compilerOptions": {
     "strict": true,

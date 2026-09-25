@@ -192,13 +192,16 @@ React dependency is shipped.
 
 The build also publishes `@emulon/telegram`. Offline installed Node and Deno
 consumers start an instance with one fixture channel, issue a bot through the
-SDK and call `getMe` with the requests grammY sends. A wrong token receives the
-401 envelope, a malformed one 404, `setWebhook` 501 and an unknown method 404;
-after reset the old token fails even though the next bot reuses its ID. The
-manifest matches npm metadata and the installed command. See
-[the package guide](../packages/telegram/README.md) and the
-[installed proof](../scripts/telegram-proof.ts). `grammy@1.44.0` is a
-development-only import and is never shipped or packed for consumers.
+SDK and call `getMe` and `sendMessage` with the requests grammY sends. A
+MarkdownV2 post reaches the channel by ID and by `@username` with consecutive
+message IDs, unescaped markup receives the 400 envelope, and `messages list`
+returns both posts. A wrong token receives the 401 envelope, a malformed one
+404, `setWebhook` 501 and an unknown method 404; after reset the old token fails
+even though the next bot reuses its ID. The manifest matches npm metadata and
+the installed command. See [the package guide](../packages/telegram/README.md)
+and the [installed proof](../scripts/telegram-proof.ts). `grammy@1.44.0` and
+`md-to-telegram@0.1.1` are development-only imports and are never shipped or
+packed for consumers.
 
 ## Combined Stripe and Cal.com example
 

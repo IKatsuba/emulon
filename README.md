@@ -34,7 +34,7 @@ the same command contract.
 | [`@emulon/stripe`](packages/stripe)     | Stripe catalog, promotion codes, Checkout, refunds and disputes |
 | [`@emulon/calcom`](packages/calcom)     | Cal.com API v2 event types, availability and bookings           |
 | [`@emulon/polar`](packages/polar)       | Polar customers and their webhooks                              |
-| [`@emulon/telegram`](packages/telegram) | Telegram Bot API bots and token authentication                  |
+| [`@emulon/telegram`](packages/telegram) | Telegram Bot API bots and MarkdownV2 channel posts              |
 
 Packages run on Node.js 22.13 or later and on Deno.
 

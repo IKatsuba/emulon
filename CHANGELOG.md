@@ -13,6 +13,11 @@ project adheres to [Semantic Versioning](https://semver.org/).
   `/bot<token>/getMe` with Bot API envelopes, and `fixtures.channels` declares
   channels. Other typed Bot API methods, including the webhook methods, return
   explicit 501 errors.
+- `@emulon/telegram`: `sendMessage` posts to a configured channel by ID or
+  `@username`, as plain text or MarkdownV2 parsed into entities with UTF-16
+  offsets, with per-chat monotone message IDs; malformed markup and text over
+  4096 rendered units fail without writing. `messages list` shows the submitted
+  and rendered text of a channel's messages.
 - `@emulon/stripe`: products, one-time prices, coupons, promotion codes, hosted
   Checkout Sessions with a local payment page, payment intents, charges, refunds
   and disputes, with `checkout.session.completed`, `checkout.session.expired`,

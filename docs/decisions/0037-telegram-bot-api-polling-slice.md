@@ -225,3 +225,47 @@ consumer proof must subscribe before injecting one.
 - [ADR 0014](0014-hono-http-layer.md) specifies owned Hono surfaces and HTTP
   lifecycle middleware.
 - [ADR 0026](0026-reset-observation-barrier.md) specifies the reset barrier.
+
+## Addendum: channel publishing decisions
+
+These choices were open inside the scope above and are settled by the channel
+publishing part. They add no provider operation beyond this ADR.
+
+- **Test-only `md-to-telegram@0.1.1`.** The first consumer builds its posts with
+  `toTelegramMarkdownV2` and cuts them with
+  `splitMessage(text, { format: 'markdownv2' })`. The package is added as an
+  exact, test-only Deno import like grammY: a representative post (headings,
+  lists, links with parentheses, inline and fenced code, bold, italic, both,
+  strikethrough, spoiler, underline, quotations, an expandable quotation, a
+  table, a thematic break, astral characters and a paragraph longer than one
+  message) is converted, split and sent part by part through grammY. It never
+  enters the npm archive; the installed proof asserts that.
+- **Constructs.** The parser accepts everything that converter emits for
+  MarkdownV2: escapes, `*bold*`, `_italic_`, `__underline__`, `~strike~`,
+  `||spoiler||`, inline code, fenced code with an optional language, links, `>`
+  block quotations and `**>…||` expandable block quotations. It follows the
+  TDLib parser's single pass: `__` binds greedily, empty entities are dropped,
+  entities nest only by containment, links cannot contain links, and a quotation
+  cannot start inside another entity or be left with one open. A quotation is
+  expandable when its last line ends in `||` outside a spoiler. Custom emoji,
+  date-time entities, `tg://` mentions and non-HTTP link schemes are refused
+  with `can't parse entities` instead of being rendered differently, as is code
+  spanning quoted lines, whose prefix rules are undocumented. Link targets
+  without a scheme get `http://`; a target that is not a URL keeps its text
+  without an entity, as Telegram does. Telegram's automatic URL, mention and
+  hashtag entities and its whitespace trimming are not emulated. Each limit is a
+  manifest limitation.
+- **Validation order.** Unsupported fields are refused first (501), then the
+  chat is resolved (400 `chat not found`), then the text is parsed (400
+  `can't parse entities`), then an empty result (400 `message text is empty`)
+  and the length (400 `message is too long`) are checked, all before an ID is
+  allocated. `disable_notification` accepts either boolean and
+  `link_preview_options` accepts `{}` or `is_disabled: false`, since both are
+  the defaults the emulator already follows; HTML and legacy Markdown parse
+  modes return 501.
+- **Message projection.** A channel post carries `sender_chat` equal to `chat`
+  as Telegram returns it, and also the `from` bot user this ADR requires.
+- **Listing.** `messages.list` takes a numeric `chatId`, because a CLI flag
+  cannot mix string and number values, and an optional `limit` of 1–100 (default
+  100). It returns the most recent messages oldest first, so a recent multipart
+  post always reads whole and in order.

@@ -22,7 +22,7 @@ try {
   equal(defineCompatibility(pkg.emulon.compatibility), manifest, "npm metadata");
   equal(await env.services.tg.compatibility.get({}), manifest, "installed command");
   assert(!manifest.capabilities.includes("webhooks"), "Webhook capability claimed");
-  assert(!Object.keys({ ...pkg.dependencies, ...pkg.peerDependencies }).some((name) => name === "grammy" || name.startsWith("@grammyjs/")), "grammY shipped");
+  assert(!Object.keys({ ...pkg.dependencies, ...pkg.peerDependencies }).some((name) => name === "grammy" || name.startsWith("@grammyjs/") || name === "md-to-telegram"), "Test dependency shipped");
   const apiRoot = env.endpoints.tg.api;
   assert(!apiRoot.endsWith("/"), "Endpoint has a trailing slash");
   const bot = await env.services.tg.bots.create({ username: "installed_bot", firstName: "Installed" });
@@ -42,6 +42,15 @@ try {
   equal(await call("malformed", "getMe"), { status: 404, body: { ok: false, error_code: 404, description: "Not Found" } }, "malformed token");
   equal((await call(bot.token, "setWebhook", { url: "http://127.0.0.1:1" })).status, 501, "setWebhook");
   equal((await call(bot.token, "notAMethod")).status, 404, "unknown method");
+  const sent = [];
+  for (const chat_id of [channel.id, "@Local_News"]) {
+    const response = await call(bot.token, "sendMessage", { chat_id, text: "*Part* 1\\\\.", parse_mode: "MarkdownV2", disable_notification: true, link_preview_options: { is_disabled: false } });
+    equal(response.status, 200, "sendMessage status");
+    sent.push(response.body.result);
+  }
+  equal(sent.map((message) => [message.message_id, message.chat.id, message.text, message.entities]), [1, 2].map((id) => [id, channel.id, "Part 1.", [{ type: "bold", offset: 0, length: 4 }]]), "sendMessage result");
+  equal(await call(bot.token, "sendMessage", { chat_id: channel.id, text: "Unescaped.", parse_mode: "MarkdownV2" }), { status: 400, body: { ok: false, error_code: 400, description: "Bad Request: can't parse entities" } }, "bad markup");
+  equal((await env.services.tg.messages.list({ chatId: channel.id })).map((message) => [message.messageId, message.source, message.text]), [[1, "*Part* 1\\\\.", "Part 1."], [2, "*Part* 1\\\\.", "Part 1."]], "messages list");
   await env.reset();
   equal((await call(bot.token, "getMe")).status, 401, "token after reset");
   const again = await env.services.tg.bots.create({ username: "installed_bot", firstName: "Again" });
@@ -51,6 +60,6 @@ try {
 } finally {
   await env.dispose();
 }
-console.log("Telegram installed getMe, token rejection, 501 methods, reset and manifest parity passed");
+console.log("Telegram installed getMe, sendMessage, messages list, token rejection, 501 methods, reset and manifest parity passed");
 `;
 }
