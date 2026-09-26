@@ -2,11 +2,17 @@ import polar from '@emulon/polar';
 import { Emulon } from 'emulon';
 import { serveEnvironment } from '../../emulon/src/control/server.ts';
 import { runProjectCLI } from '../../emulon/src/cli/project.ts';
-import type {
-  Benefit,
-  Inspection,
-  LicenseKey,
-  LicenseKeyWithActivations,
+import {
+  projectTarget,
+  statePath,
+} from '../../emulon/src/runtime/discovery.ts';
+import { sqliteCoordinator } from '../../emulon/src/runtime/sqlite-state.ts';
+import {
+  activateLicenseKey,
+  type Benefit,
+  type Inspection,
+  type LicenseKey,
+  type LicenseKeyWithActivations,
 } from '../src/model/license_keys.ts';
 import { properties, readExcerpt, validate } from './schema.ts';
 import { organizationId } from './customers_cases.ts';
@@ -35,6 +41,58 @@ function captureConsole() {
       }
     },
   };
+}
+
+/**
+ * Part 1 has no public activation route, so live activations are written
+ * while the host is stopped, through the same primitive the route will use.
+ */
+async function activateOffline(
+  directory: string,
+  key: string,
+  labels: string[],
+) {
+  const coordinator = sqliteCoordinator(
+    await statePath(await projectTarget({ directory })),
+  );
+  const version = { pluginVersion: '0.1.0', schemaVersion: 1 };
+
+  try {
+    coordinator.prepare([{
+      instanceId: 'billing',
+      plugin: '@emulon/polar',
+      version,
+    }]);
+
+    const handle = await coordinator.open({
+      environmentId: coordinator.environmentId,
+      instanceId: 'billing',
+      version,
+      fixtures: [],
+    });
+
+    try {
+      const ids: string[] = [];
+
+      for (const label of labels) {
+        ids.push(
+          (await activateLicenseKey(handle.store, {
+            key,
+            organizationId,
+            label,
+            conditions: {},
+            meta: {},
+          })).id,
+        );
+      }
+
+      return ids;
+    } finally {
+      handle.close();
+    }
+  } finally {
+    coordinator.close();
+  }
 }
 
 async function failure(action: () => Promise<unknown>) {
@@ -444,21 +502,112 @@ Deno.test(
         await sdk.webhooks.list({}),
       );
 
-      // Restart keeps benefits, keys and customer links.
+      // Restart keeps benefits, keys, customer links and activations.
       await host.dispose();
+
+      const [laptop, desktop] = await activateOffline(directory, granted.key, [
+        'laptop',
+        'desktop',
+      ]);
 
       host = await serveEnvironment(config, { directory });
 
       await using restarted = await Emulon.connect({ config, directory });
+      const billing = restarted.services.billing;
+      const active: LicenseKeyWithActivations = await cli([
+        'license-keys',
+        'get',
+        '--id',
+        granted.id,
+      ]);
 
+      equal(await billing.licenseKeys.get({ id: granted.id }), active);
       equal(
-        await restarted.services.billing.licenseKeys.get({ id: granted.id }),
-        await cli(['license-keys', 'get', '--id', granted.id]),
+        active.activations.map(({ id, label }) => [id, label]).sort(),
+        [[laptop, 'laptop'], [desktop, 'desktop']].sort(),
       );
       equal(
-        (await restarted.services.billing.licenseKeys.list({})).length,
-        2,
+        validate(
+          document,
+          '#/components/schemas/LicenseKeyWithActivations',
+          active,
+        ),
+        [],
       );
+
+      const diagnosed: Inspection = await cli([
+        'license-keys',
+        'inspect',
+        '--id',
+        granted.id,
+      ]);
+
+      equal(await billing.licenseKeys.inspect({ id: granted.id }), diagnosed);
+      equal(diagnosed.activation_ids.sort(), [laptop!, desktop!].sort());
+      visible.push(diagnosed);
+
+      // One activation is freed through each boundary.
+      const freed = await cli([
+        'license-keys',
+        'deactivate',
+        '--id',
+        granted.id,
+        '--activation-id',
+        laptop!,
+      ]);
+
+      equal(freed, { deactivated: true });
+
+      const remaining: LicenseKeyWithActivations = await billing.licenseKeys
+        .get({ id: granted.id });
+
+      equal(remaining.activations.map(({ id }) => id), [desktop]);
+      equal(
+        (await cli(['license-keys', 'inspect', '--id', granted.id]))
+          .activation_ids,
+        [desktop],
+      );
+      equal(
+        await billing.licenseKeys.deactivate({
+          id: granted.id,
+          activationId: desktop!,
+        }),
+        freed,
+      );
+      equal(await cli(['license-keys', 'get', '--id', granted.id]), {
+        ...active,
+        activations: [],
+      });
+      equal(
+        (await billing.licenseKeys.inspect({ id: granted.id })).activation_ids,
+        [],
+      );
+      visible.push(freed);
+
+      // A freed activation cannot be freed again on either path.
+      {
+        const fromCLI = await cliError([
+          'billing',
+          'license-keys',
+          'deactivate',
+          '--id',
+          granted.id,
+          '--activation-id',
+          laptop!,
+        ]);
+        const fromConnected = await failure(() =>
+          billing.licenseKeys.deactivate({
+            id: granted.id,
+            activationId: laptop!,
+          })
+        );
+
+        equal(fromCLI.error.code, 'ResourceNotFound');
+        equal(fromCLI.error, fromConnected);
+        visible.push(fromCLI.stderr, fromConnected);
+      }
+
+      equal((await billing.licenseKeys.list({})).length, 2);
 
       // Reset restores fixtures only: keys and benefits are gone.
       await restarted.reset();
