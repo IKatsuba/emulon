@@ -117,7 +117,7 @@ export default defineConfig({
 });
 ```
 
-`github` and `mail` are instance names, not package names. Multiple instances of the same plugin have separate state, credentials, ports, and queues. Core command names are reserved and cannot be used as instance names.
+`github` and `mail` are instance names, not package names. A `services` value may also be `{ service: github(), ports: { api: 43124, web: 43125 } }` to give provider surfaces fixed loopback ports; the control API stays on a dynamic port ([ADR 0039](decisions/0039-instance-http-ports.md)). Multiple instances of the same plugin have separate state, credentials, ports, and queues. Core command names are reserved and cannot be used as instance names.
 
 TypeScript configuration is executable trusted project code. Configuration loading, npm dependency resolution, and support for Node and Deno are validated by [distribution verification](distribution.md).
 
@@ -153,7 +153,7 @@ The environment owns plugin instances, listeners, storage, clocks, and jobs. Own
 
 `emulon up` starts a foreground environment and writes a discovery record containing its identity and connection information. CLI calls use the current project's record, with an explicit environment override for concurrent environments. Stale records are detected through an authenticated identity check. [ADR 0007](decisions/0007-control-api-and-discovery.md) specifies the loopback transport, project discovery record, `--environment` selector, and `Emulon.connect()` options.
 
-`Emulon.start()` creates a private environment and returns a typed client. `Emulon.connect()` attaches to an existing one. Disposing a started environment shuts it down; disposing an attached client only disconnects. Startup uses dynamically allocated ports and rolls back already-started components if any instance fails readiness.
+`Emulon.start()` creates a private environment and returns a typed client. `Emulon.connect()` attaches to an existing one. Disposing a started environment shuts it down; disposing an attached client only disconnects. Startup uses dynamically allocated ports unless an instance fixes a port for a provider surface, and rolls back already-started components if any instance fails readiness. A fixed port is bound on loopback only and is never replaced: an occupied port fails startup with `PORT_IN_USE` ([ADR 0039](decisions/0039-instance-http-ports.md)).
 
 The local control API is separate from provider-facing endpoints, binds to loopback, and requires an environment-specific credential. Browser auth sessions cannot invoke arbitrary management commands. Credentials are not printed in normal status output.
 

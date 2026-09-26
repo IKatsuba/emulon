@@ -2,6 +2,7 @@ import { DeliveryError } from '../deliveries/errors.ts';
 import { DomainError } from './domain-error.ts';
 import type { z } from 'zod';
 import type { Registration } from '../plugins/define.ts';
+import type { ServiceEntry } from '../sdk/instances.ts';
 import type { PluginContext } from '../plugins/types.ts';
 import { type Command, metadata } from './define.ts';
 
@@ -25,10 +26,13 @@ type Path<Key extends string, Value> = Key extends `${infer Head}.${infer Tail}`
   ? { readonly [K in Head]: Path<Tail, Value> }
   : { readonly [K in Key]: Value };
 export type Services<
-  Config extends { services: Record<string, Registration> },
+  Config extends { services: Record<string, ServiceEntry> },
 > = {
   readonly [Name in keyof Config['services']]: Config['services'][Name] extends
-    Registration<unknown, infer Commands> ? Client<Commands> : never;
+    Registration<unknown, infer Commands> ? Client<Commands>
+    : Config['services'][Name] extends
+      { service: Registration<unknown, infer Commands> } ? Client<Commands>
+    : never;
 };
 
 export class CommandError extends Error {

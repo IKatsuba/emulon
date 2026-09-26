@@ -1,9 +1,9 @@
 import { isDomainError } from '../commands/domain-error.ts';
-import type { Registration } from '../plugins/define.ts';
 import { configExists, configURL } from '../runtime/project.ts';
 import { defineConfig } from './config.ts';
+import type { ServiceEntry } from './instances.ts';
 
-export type Configuration = { services: Record<string, Registration> };
+export type Configuration = { services: Record<string, ServiceEntry> };
 
 export class ConfigError extends Error {
   readonly code: string;
@@ -19,8 +19,13 @@ export class ConfigError extends Error {
 export function validateConfig(value: unknown): Configuration {
   try {
     return defineConfig(value as Configuration);
-  } catch {
-    // Project code and validation errors can contain credentials.
+  } catch (error) {
+    // Only a configuration verdict is safe to show; project code and other
+    // validation errors can contain credentials.
+    if (isDomainError(error) && error.code === 'CONFIG_INVALID') {
+      throw new ConfigError(error.code, error.message);
+    }
+
     throw new ConfigError('CONFIG_INVALID', 'Invalid Emulon configuration.');
   }
 }

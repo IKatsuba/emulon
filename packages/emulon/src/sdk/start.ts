@@ -22,6 +22,7 @@ import { readRegistration } from '../plugins/define.ts';
 import { httpContext } from '../plugins/http.ts';
 import type { PluginInstance, PluginPresentation } from '../plugins/types.ts';
 import { type Configuration, validateConfig } from './load.ts';
+import { readInstances, unmatchedSurfaces } from './instances.ts';
 
 import {
   bindRegistry,
@@ -58,6 +59,8 @@ export async function startWithAdapter<const Config extends Configuration>(
 ): Promise<Environment<Config>> {
   validateConfig(config);
 
+  const instances = readInstances(config.services);
+
   const hub = eventHub();
   const owned: {
     host: ReturnType<typeof httpContext>;
@@ -75,7 +78,7 @@ export async function startWithAdapter<const Config extends Configuration>(
   const registry = new Registry();
   // Validate every declaration before any plugin can allocate resources.
   const declarations = new Map(
-    Object.entries(config.services).map(([name, registration]) =>
+    instances.map(([name, { registration }]) =>
       [
         name,
         commandEntries(readRegistration(registration).definition.commands),
@@ -85,7 +88,7 @@ export async function startWithAdapter<const Config extends Configuration>(
 
   try {
     coordinator?.prepare(
-      Object.entries(config.services).map(([instanceId, registration]) => {
+      instances.map(([instanceId, { registration }]) => {
         const { definition } = readRegistration(registration);
 
         return {
@@ -103,7 +106,7 @@ export async function startWithAdapter<const Config extends Configuration>(
   }
 
   const fixtures = new Map(
-    Object.entries(config.services).map(([name, registration]) => {
+    instances.map(([name, { registration }]) => {
       const { definition, options } = readRegistration(registration);
 
       try {
@@ -166,12 +169,13 @@ export async function startWithAdapter<const Config extends Configuration>(
     })();
   }
 
-  for (const [name, registration] of Object.entries(config.services)) {
-    const entry: typeof owned[number] = { host: httpContext() };
+  for (const [name, { registration, ports }] of instances) {
+    const entry: typeof owned[number] = { host: httpContext(ports) };
 
     owned.push(entry);
 
     let versionError: Error | undefined;
+    let unmatched: string | undefined;
 
     try {
       const { definition, options } = readRegistration(registration);
@@ -289,6 +293,15 @@ export async function startWithAdapter<const Config extends Configuration>(
       entry.instance = await definition.setup(context, options);
 
       await entry.instance.ready();
+
+      // Plugins do not declare surfaces, so only a started instance can tell
+      // that a configured port names none of them.
+      unmatched = unmatchedSurfaces(ports, entry.host.listened())[0];
+
+      if (unmatched !== undefined) {
+        throw new Error('Unmatched surface');
+      }
+
       Object.defineProperty(endpoints, name, {
         value: Object.freeze({ ...entry.instance.endpoints }),
         enumerable: true,
@@ -315,11 +328,26 @@ export async function startWithAdapter<const Config extends Configuration>(
         throw versionError;
       }
 
+      const suffix = rollbackFailed ? ' Rollback failed.' : '';
+      const failure = entry.host.failure();
+
+      if (failure) {
+        throw new CommandError(
+          failure.code,
+          `Service instance "${name}" surface "${failure.surface}" cannot listen on port ${failure.port} because it is already in use.${suffix}`,
+        );
+      }
+
+      if (unmatched !== undefined) {
+        throw new CommandError(
+          'CONFIG_INVALID',
+          `Service instance "${name}" has no surface "${unmatched}" for its configured port.${suffix}`,
+        );
+      }
+
       throw new CommandError(
         'ENVIRONMENT_FAILED',
-        `Service instance "${name}" failed to start.${
-          rollbackFailed ? ' Rollback failed.' : ''
-        }`,
+        `Service instance "${name}" failed to start.${suffix}`,
       );
     }
   }

@@ -25,9 +25,9 @@ await env.reset();
 
 The official client is tested at `resend@6.28.1` using its `baseUrl` option.
 Install it separately in the consuming application. No email is actually sent.
-Each environment owns isolated loopback listeners on dynamic ports; disposal
-closes them. Keys are securely generated per instance and reset invalidates
-them.
+Each environment owns isolated loopback listeners on dynamic ports (or on fixed
+`ports` configured for the instance); disposal closes them. Keys are securely
+generated per instance and reset invalidates them.
 
 For a project running `emulon up`, the same registry exposes:
 

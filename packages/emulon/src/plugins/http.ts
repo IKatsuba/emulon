@@ -2,10 +2,21 @@ import { Hono } from 'hono';
 import { bodyLimit } from './http-rules.ts';
 import { boundedBody, requestLifecycle } from './http-middleware.ts';
 import { listen, type Listener } from '../runtime/http.ts';
+import { PortInUseError } from '../runtime/port-in-use.ts';
 import type { PluginContext } from './types.ts';
 
-export function httpContext() {
+/** A bind failure the host reports under its own code after rollback. */
+export interface ListenFailure {
+  code: 'PORT_IN_USE';
+  surface: string;
+  port: number;
+}
+
+export function httpContext(
+  ports: ReadonlyMap<string, number> = new Map(),
+) {
   const listeners = new Map<string, Promise<Listener>>();
+  let failure: ListenFailure | undefined;
   const surfaces = new Map<string, Hono>();
   const lifecycle = requestLifecycle();
 
@@ -45,14 +56,34 @@ export function httpContext() {
             throw new Error('HTTP surface must exist and listen only once');
           }
 
-          const pending = listen(app.fetch);
+          const pending = listen(app.fetch, ports.get(name) ?? 0);
 
           listeners.set(name, pending);
 
-          return (await pending).url;
+          try {
+            return (await pending).url;
+          } catch (error) {
+            // The plugin may wrap or swallow this; the host keeps the cause.
+            if (error instanceof PortInUseError) {
+              failure ??= {
+                code: 'PORT_IN_USE',
+                surface: name,
+                port: error.port,
+              };
+            }
+
+            throw error;
+          }
         },
       },
     } satisfies Pick<PluginContext, 'http'>,
+    /** Surfaces that were asked to listen, whether or not binding succeeded. */
+    listened(): ReadonlySet<string> {
+      return new Set(listeners.keys());
+    },
+    failure(): ListenFailure | undefined {
+      return failure;
+    },
     pause: lifecycle.pause,
     resume: lifecycle.resume,
     async stop() {

@@ -7,6 +7,7 @@ import {
   type Services,
 } from '../commands/registry.ts';
 import { readRegistration } from '../plugins/define.ts';
+import { readInstances } from './instances.ts';
 import { remoteEvents } from '../events/client.ts';
 import { discover, request } from '../control/client.ts';
 import type { Target } from '../control/protocol.ts';
@@ -52,7 +53,7 @@ export async function connect(
 
   const services = Object.create(null);
 
-  for (const [name, registration] of Object.entries(config.services)) {
+  for (const [name, { registration }] of readInstances(config.services)) {
     registry.instances.set(name, {
       commands: commandEntries(
         readRegistration(registration).definition.commands,

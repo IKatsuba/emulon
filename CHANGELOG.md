@@ -6,6 +6,17 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `emulon`: a `services` value may be `{ service, ports }` to give an instance's
+  provider surfaces fixed loopback ports, such as
+  `billing: { service: polar(), ports: { api: 43123 } }`, so `emulon up` and
+  `Emulon.start()` report the same endpoint on every run. An occupied port fails
+  startup with `PORT_IN_USE` and rolls back without falling back to another
+  port; a port shared by two surfaces or naming a surface the plugin does not
+  serve is `CONFIG_INVALID`. Without `ports`, or with port 0, allocation stays
+  dynamic.
+
 ## [0.2.0] - 2026-09-26
 
 ### Added

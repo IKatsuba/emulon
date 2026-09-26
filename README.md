@@ -68,6 +68,30 @@ export default defineConfig({
 });
 ```
 
+Each instance listens on a dynamically allocated loopback port unless it pins
+one. An application that embeds a provider URL at build time can give an
+instance a fixed port per surface by wrapping its registration:
+
+```ts
+export default defineConfig({
+  services: {
+    github: {
+      service: github(),
+      ports: { api: 43124, web: 43125 },
+    },
+    mail: resend(),
+  },
+});
+```
+
+`ports` keys are the instance's surface names (`api`, and `web` for GitHub and
+Stripe); an omitted surface or port 0 stays dynamic. Ports are integers from 1
+to 65535, bound on `127.0.0.1` only, and never replaced by another port: an
+occupied port fails startup with `PORT_IN_USE`, and the same port on two
+surfaces, or a surface the plugin does not serve, is `CONFIG_INVALID`. The local
+control API always uses a dynamic port. See
+[ADR 0039](docs/decisions/0039-instance-http-ports.md).
+
 While `emulon up` is running, drive services from another terminal:
 
 ```sh

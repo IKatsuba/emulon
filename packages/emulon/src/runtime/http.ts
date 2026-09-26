@@ -1,5 +1,6 @@
 import { serve } from '@hono/node-server';
 import { serveDeno } from './deno-http.ts';
+import { PortInUseError } from './port-in-use.ts';
 
 export interface Listener {
   url: string;
@@ -7,23 +8,32 @@ export interface Listener {
 }
 export type Handler = (request: Request) => Response | Promise<Response>;
 
-export function listen(handler: Handler): Promise<Listener> {
-  return 'Deno' in globalThis ? serveDeno(handler) : serveNode(handler);
+/** Binds loopback only; port 0 lets the operating system allocate one. */
+export function listen(handler: Handler, port = 0): Promise<Listener> {
+  return 'Deno' in globalThis
+    ? serveDeno(handler, port)
+    : serveNode(handler, port);
 }
 
-export async function serveNode(handler: Handler): Promise<Listener> {
+export async function serveNode(handler: Handler, port = 0): Promise<Listener> {
   // Keep native web globals intact when multiple runtime adapters share a process.
   const server = serve({
     fetch: handler,
     hostname: '127.0.0.1',
-    port: 0,
+    port,
     overrideGlobalObjects: false,
   });
 
   await new Promise<void>((resolve, reject) => {
-    server.once('error', reject);
+    const failed = (error: Error & { code?: string }) => {
+      reject(
+        port && error.code === 'EADDRINUSE' ? new PortInUseError(port) : error,
+      );
+    };
+
+    server.once('error', failed);
     server.once('listening', () => {
-      server.off('error', reject);
+      server.off('error', failed);
       resolve();
     });
   });
@@ -37,7 +47,7 @@ export async function serveNode(handler: Handler): Promise<Listener> {
   let stopping: Promise<void> | undefined;
 
   return {
-    url: `http://127.0.0.1:${address.port}`,
+    url: `http://${address.address}:${address.port}`,
     stop() {
       return stopping ??= new Promise<void>((resolve, reject) => {
         server.close((error) => error ? reject(error) : resolve());

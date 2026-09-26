@@ -31,6 +31,42 @@ external ID uniqueness and emit no events. One instance is one organization; a
 second instance is a second organization with its own customers and its own
 credentials.
 
+## Stable address for a desktop client
+
+A desktop application that embeds its billing URL at build time needs the same
+endpoint after every `emulon up`. Fix the `api` surface's port on the instance,
+and the organization ID that license-key requests name:
+
+```ts
+// emulon.config.ts
+import { defineConfig } from 'emulon';
+import polar from '@emulon/polar';
+
+export default defineConfig({
+  services: {
+    billing: {
+      service: polar({
+        organizationId: '1b4e28ba-2fa1-4d3b-a3f5-ef19b5a7633b',
+      }),
+      ports: { api: 43123 },
+    },
+  },
+});
+```
+
+Build the development client with `serverURL: 'http://127.0.0.1:43123'` (no
+`/v1`) and that organization ID. `emulon status` and `Emulon.start()` with the
+same configuration report the same `billing.api` endpoint on every run, and
+retained state keeps issued tokens and license keys across restarts until
+`emulon reset`.
+
+The listener binds `127.0.0.1` only and never falls back to another port. If
+something else holds 43123, `emulon up` exits with `PORT_IN_USE` naming
+`billing`, `api` and the port; nothing is left running and no discovery record
+is written. Free the port or choose another one and rebuild the client. The same
+port given to two instances or surfaces is refused as `CONFIG_INVALID` before
+anything starts. See [ADR 0039](decisions/0039-instance-http-ports.md).
+
 ## One state behind every caller
 
 A running project serves the CLI, the connected typed SDK, plain HTTP and the

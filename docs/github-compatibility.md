@@ -57,8 +57,9 @@ and verified webhooks, never the private key, JWT, token or webhook secret.
 
 Use `env.endpoints.github.web` for the authorization URL and token exchange; use
 `env.endpoints.github.api` for authenticated REST requests. They have separate
-dynamic ports. Never infer one endpoint from the other or leave a client at its
-public GitHub default.
+ports, dynamic unless the instance fixes them with `ports: { api, web }`. Never
+infer one endpoint from the other or leave a client at its public GitHub
+default.
 
 ```ts
 const authorization = new URL(
