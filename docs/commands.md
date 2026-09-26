@@ -61,7 +61,10 @@ envelope; stack traces and extra properties are discarded. Use static messages
 and never include credentials, raw inputs, or underlying exception text. For
 example, GitHub issue creation reports `REPOSITORY_NOT_FOUND` and explains how
 to configure `github fixtures.repositories`. `COMMAND_FAILED` hides all other
-executor exception text (apart from the core's fixed delivery errors).
+executor exception text (apart from the core's fixed delivery errors). A plugin
+factory may also throw `DomainError('CONFIG_INVALID', message)` for an unusable
+option; loading the configuration then reports that code and message instead of
+`CONFIG_IMPORT_FAILED` (see [ADR 0003](decisions/0003-config-loader.md)).
 Diagnostics omit input values and custom schema messages to avoid exposing
 credentials. Output validation happens after execution and does not roll back
 mutations.

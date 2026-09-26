@@ -43,10 +43,14 @@ organization is indistinguishable from an unknown key. The current
 single-organization instance accepts only its configured organization ID.
 Because these bodies accept only a version 4 UUID of the RFC 4122 variant, the
 `organizationId` option is held to the same rule when `polar(options)` is called
-and is stored lowercased; any other value fails at configuration time rather
-than on every public call. Apply ADR 0033's fixed `Polar-Version: 2026-04`
-selection to these routes independently of OAT authentication; missing selects
-the pin, and an unsupported supplied version still fails before mutation. The
+and is stored lowercased; any other value throws
+`DomainError('CONFIG_INVALID', …)` at configuration time rather than failing
+every public call, so `emulon up` and `Emulon.load` report `CONFIG_INVALID` with
+a message that names the option but not the value
+([ADR 0003](0003-config-loader.md)). Apply ADR 0033's fixed
+`Polar-Version: 2026-04` selection to these routes independently of OAT
+authentication; missing selects the pin, and an unsupported supplied version
+still fails before mutation. The
 [customer-portal endpoints](https://github.com/polarsource/polar/blob/5514f6a85e9e856857f8662a58d1deb69bc4a2fd/server/polar/customer_portal/endpoints/license_keys.py#L144-L233)
 and the pinned SDK's
 [activate](https://github.com/polarsource/polar-js/blob/v0.49.0/src/funcs/customerPortalLicenseKeysActivate.ts),

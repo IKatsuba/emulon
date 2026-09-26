@@ -83,6 +83,15 @@ Deno.test('loader reports stable safe errors for import and shape failures', asy
     const [source, code] of [
       ['throw new Error("secret-marker")', 'CONFIG_IMPORT_FAILED'],
       [
+        'throw Object.assign(new Error("secret-marker"), { code: "CONFIG_INVALID" })',
+        'CONFIG_IMPORT_FAILED',
+      ],
+      [
+        'import { DomainError } from "emulon";\n' +
+        'throw new DomainError("NotPermitted", "secret-marker");',
+        'CONFIG_IMPORT_FAILED',
+      ],
+      [
         'export default { services: { mail: "secret-marker" } }',
         'CONFIG_INVALID',
       ],
@@ -101,6 +110,52 @@ Deno.test('loader reports stable safe errors for import and shape failures', asy
 
       assert(up.code === 1 && error.code === code);
       assert(!up.stderr.includes('secret-marker'));
+    } finally {
+      await Deno.remove(directory, { recursive: true });
+    }
+  }
+});
+
+Deno.test('loader shows a plugin configuration verdict from any emulon copy', async () => {
+  const text = 'Invalid option: expected a port.';
+  // A separate copy of emulon brands its DomainError with the same registry
+  // symbol but a different class.
+  const foreign = 'class DomainError extends Error {\n' +
+    '  constructor(code, message) {\n' +
+    '    super(message);\n' +
+    '    this.code = code;\n' +
+    '    this[Symbol.for("emulon.DomainError")] = true;\n' +
+    '  }\n' +
+    '}\n';
+
+  for (
+    const source of [
+      `import { DomainError } from "emulon";\n` +
+      `throw new DomainError("CONFIG_INVALID", "${text}");`,
+      `${foreign}throw new DomainError("CONFIG_INVALID", "${text}");`,
+    ]
+  ) {
+    const directory = await Deno.makeTempDir();
+
+    try {
+      await Deno.writeTextFile(`${directory}/emulon.config.ts`, source);
+
+      try {
+        await Emulon.load(directory);
+
+        throw new Error('Expected CONFIG_INVALID');
+      } catch (error) {
+        assert(error instanceof ConfigError);
+        assert(error.code === 'CONFIG_INVALID' && error.message === text);
+      }
+
+      const up = await runProjectCLI(['up', '--json'], undefined, directory);
+
+      assert(up.code === 1);
+
+      const error = JSON.parse(up.stderr).error;
+
+      assert(error.code === 'CONFIG_INVALID' && error.message === text);
     } finally {
       await Deno.remove(directory, { recursive: true });
     }

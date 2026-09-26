@@ -25,10 +25,10 @@ emulon up
 
 `polar(options?)` accepts `organizationId` (a fixed version 4 UUID of the RFC
 4122 variant instead of a generated one; any other value throws when `polar()`
-is called, so `emulon up` reports `CONFIG_IMPORT_FAILED`), `fixtures.customers`
-and webhook `destinations`. Fixtures take part in email and external ID
-uniqueness and emit no events. One instance is one organization; a second
-instance is a second organization with its own customers and its own
+is called, so `emulon up` reports `CONFIG_INVALID` naming the option),
+`fixtures.customers` and webhook `destinations`. Fixtures take part in email and
+external ID uniqueness and emit no events. One instance is one organization; a
+second instance is a second organization with its own customers and its own
 credentials.
 
 ## One state behind every caller

@@ -1,3 +1,4 @@
+import { isDomainError } from '../commands/domain-error.ts';
 import type { Registration } from '../plugins/define.ts';
 import { configExists, configURL } from '../runtime/project.ts';
 import { defineConfig } from './config.ts';
@@ -49,7 +50,13 @@ export async function loadConfig(directory?: string): Promise<Configuration> {
 
   try {
     value = (await import(url.href)).default;
-  } catch {
+  } catch (error) {
+    // Only a plugin's own configuration verdict is safe to show; any other
+    // exception from project code can carry credentials.
+    if (isDomainError(error) && error.code === 'CONFIG_INVALID') {
+      throw new ConfigError(error.code, error.message);
+    }
+
     throw new ConfigError(
       'CONFIG_IMPORT_FAILED',
       'Cannot import emulon.config.ts.',

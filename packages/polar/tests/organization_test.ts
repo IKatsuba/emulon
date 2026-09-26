@@ -1,14 +1,15 @@
 // Polar request fields are snake_case on the wire.
 // deno-lint-ignore-file camelcase
 import polar from '@emulon/polar';
-import { Emulon } from 'emulon';
+import { DomainError, Emulon } from 'emulon';
 import { runProjectCLI } from '../../emulon/src/cli/project.ts';
+import { ConfigError } from '../../emulon/src/sdk/load.ts';
 import { fixtures } from '../src/model/customers.ts';
 import { assert, equal, rejects } from './assert.ts';
 
 const portal = '/v1/customer-portal/license-keys';
 const message =
-  'Invalid organization ID: expected a version 4 UUID (RFC 4122 variant).';
+  'Invalid Polar organizationId: expected a version 4 UUID (RFC 4122 variant).';
 const unusable = [
   // Version digit 4 outside the RFC 4122 variant.
   '00000000-0000-4000-0000-000000000000',
@@ -29,8 +30,11 @@ Deno.test('Polar organizationId accepts only a version 4 UUID', async () => {
       thrown = error;
     }
 
-    assert(thrown instanceof Error, organizationId);
-    equal(thrown.message, message);
+    assert(thrown instanceof DomainError, organizationId);
+    equal([thrown.code, thrown.message], ['CONFIG_INVALID', message]);
+    await rejects(() =>
+      Emulon.start({ services: { billing: polar({ organizationId }) } })
+    );
     await rejects(() => Promise.resolve(fixtures({ organizationId })));
   }
 
@@ -45,12 +49,14 @@ Deno.test('Polar organizationId accepts only a version 4 UUID', async () => {
   );
 });
 
-Deno.test('Polar CLI refuses an unusable organizationId at configuration', async () => {
-  const directory = await Deno.makeTempDir();
+Deno.test('Polar CLI and SDK loader refuse an unusable organizationId at configuration', async () => {
   const plugin = new URL('../src/mod.ts', import.meta.url).href;
 
-  try {
-    for (const organizationId of unusable.slice(0, 2)) {
+  for (const organizationId of unusable.slice(0, 2)) {
+    // A fresh path per value: the module cache keeps a failed import.
+    const directory = await Deno.makeTempDir();
+
+    try {
       await Deno.writeTextFile(
         `${directory}/emulon.config.ts`,
         `import polar from '${plugin}';\n` +
@@ -60,10 +66,25 @@ Deno.test('Polar CLI refuses an unusable organizationId at configuration', async
       const up = await runProjectCLI(['up', '--json'], undefined, directory);
 
       equal(up.code, 1);
-      equal(JSON.parse(up.stderr).error.code, 'CONFIG_IMPORT_FAILED');
+
+      const { code, message: text } = JSON.parse(up.stderr).error;
+
+      equal([code, text], ['CONFIG_INVALID', message]);
+      assert(!up.stderr.includes(organizationId), organizationId);
+
+      let loaded: unknown;
+
+      try {
+        await Emulon.load(directory);
+      } catch (error) {
+        loaded = error;
+      }
+
+      assert(loaded instanceof ConfigError, organizationId);
+      equal([loaded.code, loaded.message], ['CONFIG_INVALID', message]);
+    } finally {
+      await Deno.remove(directory, { recursive: true });
     }
-  } finally {
-    await Deno.remove(directory, { recursive: true });
   }
 });
 

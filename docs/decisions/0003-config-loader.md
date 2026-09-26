@@ -51,6 +51,14 @@ Validate imported default exports with the same rules as `defineConfig`.
 Configuration failures use `CONFIG_NOT_FOUND`, `CONFIG_READ_FAILED`,
 `CONFIG_IMPORT_FAILED`, or `CONFIG_INVALID`. Do not expose exception messages
 from trusted project code or invalid values because they may contain secrets.
+The one exception is a plugin's own verdict on its options: a plugin factory
+that throws `DomainError('CONFIG_INVALID', message)` while the configuration is
+imported reports that code and message, so the caller learns which option is
+wrong. The plugin writes the message and never includes the rejected value.
+Recognition uses a `Symbol.for` brand rather than `instanceof`, because an
+installed plugin and CLI can hold separate copies of `emulon`. Every other
+import-time exception, including a `DomainError` with another code, stays
+`CONFIG_IMPORT_FAILED` without text.
 
 ## Consequences
 
@@ -59,7 +67,7 @@ resources. Dynamic loading cannot infer static names; callers needing those
 types import and pass their configuration. The native module cache means edited
 configuration requires a new process. Import-time exceptions, including
 `defineConfig` validation thrown inside the imported module, use
-`CONFIG_IMPORT_FAILED`.
+`CONFIG_IMPORT_FAILED`, apart from a plugin's `CONFIG_INVALID` `DomainError`.
 
 Archive installation, bin resolution, dependency resolution from installed
 packages, and the Node matrix belong to distribution verification; see

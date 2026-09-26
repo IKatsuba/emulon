@@ -1,7 +1,7 @@
 // Polar customer fields are snake_case on the wire.
 // deno-lint-ignore-file camelcase
 import { z } from 'zod';
-import type { Destination, PluginContext } from 'emulon';
+import { type Destination, DomainError, type PluginContext } from 'emulon';
 import { PolarError, PolarValidationError, validationIssue } from './errors.ts';
 
 /** The pinned Polar API schema; see docs/decisions/0033-polar-initial-slice.md. */
@@ -259,8 +259,9 @@ export function configuredOrganization(options?: Options): string | undefined {
   const parsed = z.uuidv4().safeParse(options.organizationId);
 
   if (!parsed.success) {
-    throw new Error(
-      'Invalid organization ID: expected a version 4 UUID (RFC 4122 variant).',
+    throw new DomainError(
+      'CONFIG_INVALID',
+      'Invalid Polar organizationId: expected a version 4 UUID (RFC 4122 variant).',
     );
   }
 

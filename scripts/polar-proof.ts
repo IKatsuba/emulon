@@ -133,6 +133,52 @@ export async function polarAcceptance(options: {
     '--no-fund',
     ...archives.map((name) => `${options.archiveDirectory}/${name}`),
   ]);
+
+  // The installed CLI and plugin may hold separate emulon copies, and the
+  // plugin's configuration verdict must still reach the caller.
+  for (
+    const organizationId of [
+      '00000000-0000-4000-0000-000000000000',
+      'c232ab00-9414-11ec-b3c8-9e6bdeced846',
+    ]
+  ) {
+    await Deno.writeTextFile(
+      `${cwd}/emulon.config.ts`,
+      'import polar from "@emulon/polar";\n' +
+        `export default { services: { billing: polar({ organizationId: "${organizationId}" }) } };\n`,
+    );
+
+    const refused = await new Deno.Command(
+      node ? 'node' : Deno.execPath(),
+      {
+        args: node
+          ? ['node_modules/emulon/esm/cli/main.js', 'up', '--json']
+          : [...denoArgs, 'npm:emulon', 'up', '--json'],
+        cwd,
+        env,
+        clearEnv: true,
+        stdout: 'piped',
+        stderr: 'piped',
+      },
+    ).output();
+    const stderr = decoder.decode(refused.stderr);
+    let error: { code?: unknown; message?: unknown } | undefined;
+
+    try {
+      error = JSON.parse(stderr).error;
+    } catch { /* Reported below. */ }
+
+    assert(
+      refused.code === 1 && error?.code === 'CONFIG_INVALID' &&
+        error.message ===
+          'Invalid Polar organizationId: expected a version 4 UUID (RFC 4122 variant).',
+      `unusable organizationId was not refused at configuration\n${stderr}`,
+    );
+    console.log(
+      `PASS ${runtime}: Polar refuses organizationId ${organizationId}`,
+    );
+  }
+
   // What a reader of docs/polar.md writes by hand.
   await Deno.writeTextFile(
     `${cwd}/emulon.config.ts`,
