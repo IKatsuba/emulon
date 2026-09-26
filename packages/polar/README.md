@@ -1,7 +1,8 @@
 # @emulon/polar
 
-Local Polar customers over the pinned `2026-04` API, selected in
-[ADR 0033](../../docs/decisions/0033-polar-initial-slice.md).
+Local Polar customers and license keys over the pinned `2026-04` API, selected
+in [ADR 0033](../../docs/decisions/0033-polar-initial-slice.md) and
+[ADR 0038](../../docs/decisions/0038-polar-license-keys.md).
 [The Polar guide](../../docs/polar.md) covers configuration, the official
 client's conversions, signing, retries and the
 [runnable example](../../examples/polar/main.mjs). The
@@ -72,6 +73,40 @@ const event = validateEvent(body, headers, 'whsec_local');
 This is Polar's legacy custom-secret mode. Secrets the Polar dashboard generated
 after 2026-09-08 are base64-decoded instead and are not supported; see the
 manifest limitations for that and for the local retry schedule.
+
+## License keys
+
+Local management commands create a `license_keys` benefit and grant it to a
+customer; the grant returns Polar's `LicenseKeyRead` with the full `key`, which
+is a credential. A desktop client then calls the public customer-portal routes
+with that key and the instance `organization_id`, and no token:
+
+```sh
+emulon billing benefits create --description 'Desktop Pro' \
+  --limit-activations 2 --enable-customer-admin --json
+emulon billing license-keys grant --benefit-id <uuid> --customer-id <uuid> --json
+emulon billing license-keys inspect --id <uuid> --json
+```
+
+```ts
+const portal = `${env.endpoints.billing.api}/v1/customer-portal/license-keys`;
+const activated = await fetch(`${portal}/activate`, {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ key, organization_id: organizationId, label: 'Mac' }),
+});
+```
+
+`/validate` and `/deactivate` take the same `key` and `organization_id` with the
+`activation_id`, and the official client's `customerPortal.licenseKeys` methods
+reach the same routes. After deactivation, validating that activation returns
+404 `{ "error": "ResourceNotFound", "detail": "Not found" }`. Refusals are
+Polar's exact envelopes; inspection, errors and logs show only `display_key`.
+[`examples/polar/license.mjs`](../../examples/polar/license.mjs) runs the whole
+lifecycle through the CLI, the connected SDK, raw `fetch` and `@polar-sh/sdk`
+with one command; [the guide](../../docs/polar.md#license-keys) describes it.
+
+## Options
 
 `polar(options)` accepts a fixed `organizationId`, webhook `destinations` and
 customer `fixtures`; fixtures take part in email and external ID uniqueness and

@@ -144,6 +144,10 @@ export async function polarAcceptance(options: {
     new URL('../examples/polar/main.mjs', import.meta.url),
     `${cwd}/main.mjs`,
   );
+  await Deno.copyFile(
+    new URL('../examples/polar/license.mjs', import.meta.url),
+    `${cwd}/license.mjs`,
+  );
 
   const cli = node
     ? ['npx', ['--offline', '--no-install', 'emulon']] as const
@@ -316,5 +320,21 @@ export async function polarAcceptance(options: {
     assert((await host.child.status).success, 'up failed during shutdown');
   } finally {
     await stop(host.child);
+  }
+
+  // The documented single command: the example starts and stops its own host
+  // in a dedicated environment, so nothing else may be running for it.
+  for (const attempt of ['first', 'repeated']) {
+    await run(
+      `${attempt} runnable Polar license lifecycle example`,
+      node ? 'node' : Deno.execPath(),
+      node ? ['license.mjs'] : [
+        ...denoArgs,
+        `--allow-run=${Deno.execPath()}`,
+        'license.mjs',
+        JSON.stringify([Deno.execPath(), [...denoArgs, 'npm:emulon']]),
+      ],
+      attempt === 'first',
+    );
   }
 }

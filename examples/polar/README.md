@@ -24,6 +24,25 @@ is never stripped or decoded. See [the Polar guide](../../docs/polar.md) for the
 conversions the official client applies, the version policy and the retry
 differences.
 
+## The license key lifecycle in one command
+
+[`license.mjs`](license.mjs) needs no separate host. In the same kind of
+project, with nothing running in its environment:
+
+```sh
+node license.mjs
+```
+
+It starts `emulon up` in a dedicated `polar-license-example` environment, resets
+it, grants one license key through the CLI and one through the connected SDK,
+and runs activate → validate → deactivate → validate with raw desktop-shaped
+`fetch` on the first key and `@polar-sh/sdk@0.49.0` on the second. Both final
+validations are refused with `ResourceNotFound: Not found`. It compares the
+manifest from npm metadata, the CLI and the SDK, checks that inspection carries
+no key, prints each step with the key's `display_key` only and stops the host.
+Under Deno, pass the CLI prefix shown below and `--allow-run=deno`. See
+[the guide](../../docs/polar.md#run-the-license-lifecycle).
+
 ## Reproduce the complete offline matrix
 
 From the repository, with Deno, Node and npm available:
@@ -37,13 +56,14 @@ The build prepares every plugin archive and the complete test-only
 `@polar-sh/sdk` npm dependency graph before verification. Dependency preparation
 may require cached packages or registry access; the verification phase needs no
 public network, no registry and no provider. `verify:dist` copies this exact
-`main.mjs` into a fresh project outside the workspace for each runtime, installs
-the archives offline, writes an `emulon.config.ts` with `billing: polar()`, runs
-a foreground `emulon up`, and then runs the example, a restart over retained
-state and a `reset`. Node's PATH contains Node and npm but no Deno; Deno runs
-with `--cached-only` and loopback-only network permission. The official client
-and its `standardwebhooks` verifier are consumer test dependencies and are
-absent from the published packages.
+`main.mjs` and `license.mjs` into a fresh project outside the workspace for each
+runtime, installs the archives offline, writes an `emulon.config.ts` with
+`billing: polar()`, runs a foreground `emulon up`, and then runs the example, a
+restart over retained state and a `reset`. After `down` it runs `license.mjs`
+twice, the second time over the restored environment. Node's PATH contains Node
+and npm but no Deno; Deno runs with `--cached-only` and loopback-only network
+permission. The official client and its `standardwebhooks` verifier are consumer
+test dependencies and are absent from the published packages.
 
 ## Run it yourself
 

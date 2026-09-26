@@ -8,6 +8,12 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `@emulon/polar`: `license_keys` benefits and granted license keys, managed by
+  `benefits create` and `license-keys grant`, `list`, `get`, `update`,
+  `deactivate` and `inspect`, and the public customer-portal routes
+  `/v1/customer-portal/license-keys/activate`, `/validate` and `/deactivate`
+  with Polar's exact refusals. `examples/polar/license.mjs` runs the lifecycle
+  with one command.
 - `@emulon/telegram`: a Telegram Bot API emulator for the pinned grammY client.
   `bots create` issues a bot token once, the `api` endpoint serves
   `/bot<token>/getMe` with Bot API envelopes, and `fixtures.channels` declares

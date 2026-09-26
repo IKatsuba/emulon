@@ -33,7 +33,7 @@ the same command contract.
 | [`@emulon/resend`](packages/resend)     | Resend email sending and reading                                |
 | [`@emulon/stripe`](packages/stripe)     | Stripe catalog, promotion codes, Checkout, refunds and disputes |
 | [`@emulon/calcom`](packages/calcom)     | Cal.com API v2 event types, availability and bookings           |
-| [`@emulon/polar`](packages/polar)       | Polar customers and their webhooks                              |
+| [`@emulon/polar`](packages/polar)       | Polar customers, their webhooks and license key activation      |
 | [`@emulon/telegram`](packages/telegram) | Telegram Bot API channel posts and reaction-count polling       |
 
 Packages run on Node.js 22.13 or later and on Deno.

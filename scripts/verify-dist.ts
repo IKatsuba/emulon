@@ -1392,6 +1392,26 @@ for (const client of [polarStarted, polarConnected]) {
   billing.webhooks.redeliver({ id: 123 });
   // @ts-expect-error Polar customer IDs remain strings.
   const wrongCustomer: number = (await billing.customers.get({ id: customerId })).id;
+  const benefit = await billing.benefits.create({ description: "Desktop Pro", limitActivations: 2, enableCustomerAdmin: true });
+  const licenseKey = await billing.licenseKeys.grant({ benefitId: benefit.id, customerId });
+  const fullKey: string = licenseKey.key;
+  const liveActivations: number = (await billing.licenseKeys.get({ id: licenseKey.id })).activations.length;
+  const activationIds: string[] = (await billing.licenseKeys.inspect({ id: licenseKey.id })).activation_ids;
+  const deactivated: true = (await billing.licenseKeys.deactivate({ id: licenseKey.id, activationId: "activation" })).deactivated;
+  await billing.licenseKeys.update({ id: licenseKey.id, status: "revoked" });
+  await billing.licenseKeys.list({});
+  // @ts-expect-error Polar license key statuses are granted, revoked or disabled.
+  billing.licenseKeys.update({ id: licenseKey.id, status: "pending" });
+  // @ts-expect-error Polar grants never take caller key material.
+  billing.licenseKeys.grant({ benefitId: benefit.id, customerId, key: "LOCAL" });
+  // @ts-expect-error Polar benefit input is flat camelCase.
+  billing.benefits.create({ description: "Desktop Pro", properties: { activations: { limit: 2 } } });
+  // @ts-expect-error Polar inspection shows only the display key.
+  (await billing.licenseKeys.inspect({ id: licenseKey.id })).key;
+  void fullKey;
+  void liveActivations;
+  void activationIds;
+  void deactivated;
   // @ts-expect-error Polar emulates no products.
   billing.products;
   void polarManifest;

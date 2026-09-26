@@ -1,11 +1,13 @@
-# Polar customers from an installed project
+# Polar customers and license keys from an installed project
 
 `@emulon/polar` emulates one Polar organization: creating and reading customers
-over the pinned `2026-04` API, and the `customer.created` webhook that creation
-records. [ADR 0033](decisions/0033-polar-initial-slice.md) selected that slice,
-and [the compatibility manifest](../packages/polar/src/compatibility.ts) is the
-authoritative tested scope — nothing below claims coverage the manifest does not
-declare.
+over the pinned `2026-04` API, the `customer.created` webhook that creation
+records, and license keys that a desktop client activates, validates and
+deactivates. [ADR 0033](decisions/0033-polar-initial-slice.md) selected the
+customer slice, [ADR 0038](decisions/0038-polar-license-keys.md) the license
+keys, and [the compatibility manifest](../packages/polar/src/compatibility.ts)
+is the authoritative tested scope — nothing below claims coverage the manifest
+does not declare.
 
 ## Configure and start
 
@@ -218,7 +220,8 @@ computation and once with `validateEvent` — compares the manifest from the CLI
 the connected SDK and installed npm metadata, and finally proves a private
 environment keeps its own state and releases its listener.
 
-`deno task verify:dist` runs exactly this example inside fresh offline
+`deno task verify:dist` runs exactly this example, and the
+[license example](#run-the-license-lifecycle), inside fresh offline
 installations under Node without Deno and under Deno, after installing the built
 archives and the cached `@polar-sh/sdk` graph from local files. The official
 client is a consumer test dependency: it is absent from the published plugin and
@@ -257,6 +260,95 @@ is the credential. Activation stores `conditions`, and validation with that
 `{ error, detail }` envelopes, checked in the order the ADR lists, and a body
 that fails validation returns `422 RequestValidationError` with `type`, `loc`
 and `msg` only, never the submitted key or conditions.
+
+What a desktop client sends needs no token, no conditions and no metadata:
+
+```ts
+const portal = `${api}/v1/customer-portal/license-keys`;
+const post = (operation: string, body: object) =>
+  fetch(`${portal}/${operation}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+const activation = await (await post('activate', {
+  key,
+  organization_id: organizationId,
+  label: 'Ada’s MacBook',
+})).json();
+const request = {
+  key,
+  organization_id: organizationId,
+  activation_id: activation.id,
+};
+await post('validate', request); // 200, status "granted"
+await post('deactivate', request); // 204
+await post('validate', request); // 404 { error: "ResourceNotFound", detail: "Not found" }
+```
+
+`organization_id` is the benefit's or key's `organization_id`, or the fixed
+`polar({ organizationId })` option. The official client takes the same values
+without an access token, and throws `ResourceNotFound` from
+`@polar-sh/sdk/models/errors/resourcenotfound.js` for a refused validation:
+
+```ts
+const client = new Polar({ serverURL: api, retryConfig: { strategy: 'none' } });
+const created = await client.customerPortal.licenseKeys.activate({
+  key,
+  organizationId,
+  label: 'studio',
+});
+await client.customerPortal.licenseKeys.validate({
+  key,
+  organizationId,
+  activationId: created.id,
+});
+```
+
+### Run the license lifecycle
+
+[`examples/polar/license.mjs`](../examples/polar/license.mjs) runs the whole
+cycle with one command. In a project that installed `emulon`, `@emulon/polar`
+and `@polar-sh/sdk@0.49.0` and configured `billing: polar()`, with no host
+running in its environment:
+
+```sh
+node license.mjs
+```
+
+It starts `emulon up` in its own `polar-license-example` environment and resets
+it, so `default` is untouched and a second run starts from nothing. The CLI
+creates a customer and a benefit with two activations and grants one key; the
+connected SDK grants a second. Each reads the other's key back, and the manifest
+from npm metadata, the CLI and the SDK must agree. Raw `fetch` then runs
+activate → validate → deactivate → validate on the first key, and
+`@polar-sh/sdk@0.49.0` does the same on the second; each final validation is
+refused with `ResourceNotFound: Not found`. It ends by inspecting both keys and
+running `emulon down`. The output names keys by `display_key` only:
+
+```text
+manifest: npm metadata, CLI and connected SDK agree (@polar-sh/sdk@0.49.0)
+grant: CLI issued ****-3F9A1C, connected SDK issued ****-B07E42, 2 activations each
+fetch: activate ****-3F9A1C → 200
+fetch: validate → 200 granted, validations 1
+fetch: deactivate → 204
+fetch: validate → 404 ResourceNotFound: Not found
+@polar-sh/sdk: activate ****-B07E42 → ok
+@polar-sh/sdk: validate → granted, validations 1
+@polar-sh/sdk: deactivate → ok
+@polar-sh/sdk: validate → ResourceNotFound: Not found
+inspect: no live activations, keys shown only as display keys
+```
+
+Under Deno, pass the CLI prefix as with the customer example and allow the
+example to run `deno`:
+
+```sh
+deno run --no-config --no-lock --node-modules-dir=manual --cached-only \
+  --allow-net=127.0.0.1 --allow-read --allow-write --allow-env --allow-run=deno \
+  license.mjs '["deno",["run","--no-config","--no-lock","--node-modules-dir=manual","--cached-only","--allow-net=127.0.0.1","--allow-read","--allow-write","--allow-env","npm:emulon"]]'
+```
 
 ## Not emulated
 
