@@ -1,0 +1,1718 @@
+{
+  "x-emulon-attribution": {
+    "description": "Minimal excerpt of the Polar OpenAPI 2026-04 schema, retained for local contract tests only. License-key benefit, key and activation schemas are copied verbatim; everything outside the selected slice is removed.",
+    "source": "https://raw.githubusercontent.com/polarsource/polar/5514f6a85e9e856857f8662a58d1deb69bc4a2fd/docs/openapi/2026-04.openapi.json",
+    "repository": "https://github.com/polarsource/polar",
+    "commit": "5514f6a85e9e856857f8662a58d1deb69bc4a2fd",
+    "sha256": "616cd5bad20b9170be8ba0640c9d729009b5dbd39c29e9ede928d36ea21fd0d6",
+    "retrieved": "2026-09-26",
+    "selection": {
+      "paths": [],
+      "schemas": [
+        "Address",
+        "BenefitLicenseKeyActivationCreateProperties",
+        "BenefitLicenseKeyActivationProperties",
+        "BenefitLicenseKeyExpirationProperties",
+        "BenefitLicenseKeys",
+        "BenefitLicenseKeysCreate",
+        "BenefitLicenseKeysCreateProperties",
+        "BenefitLicenseKeysProperties",
+        "BenefitVisibility",
+        "CustomerType",
+        "LicenseKeyActivationBase",
+        "LicenseKeyCustomer",
+        "LicenseKeyRead",
+        "LicenseKeyStatus",
+        "LicenseKeyWithActivations",
+        "MetadataOutputType",
+        "TaxIDFormat"
+      ]
+    }
+  },
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Polar API",
+    "summary": "Polar HTTP and Webhooks API",
+    "description": "Read the docs at https://polar.sh/docs/api-reference",
+    "version": "2026-04"
+  },
+  "paths": {},
+  "components": {
+    "schemas": {
+      "Address": {
+        "properties": {
+          "line1": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line1"
+          },
+          "line2": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line2"
+          },
+          "postal_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Postal Code"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "country": {
+            "type": "string",
+            "enum": [
+              "AD",
+              "AE",
+              "AF",
+              "AG",
+              "AI",
+              "AL",
+              "AM",
+              "AO",
+              "AQ",
+              "AR",
+              "AS",
+              "AT",
+              "AU",
+              "AW",
+              "AX",
+              "AZ",
+              "BA",
+              "BB",
+              "BD",
+              "BE",
+              "BF",
+              "BG",
+              "BH",
+              "BI",
+              "BJ",
+              "BL",
+              "BM",
+              "BN",
+              "BO",
+              "BQ",
+              "BR",
+              "BS",
+              "BT",
+              "BV",
+              "BW",
+              "BY",
+              "BZ",
+              "CA",
+              "CC",
+              "CD",
+              "CF",
+              "CG",
+              "CH",
+              "CI",
+              "CK",
+              "CL",
+              "CM",
+              "CN",
+              "CO",
+              "CR",
+              "CU",
+              "CV",
+              "CW",
+              "CX",
+              "CY",
+              "CZ",
+              "DE",
+              "DJ",
+              "DK",
+              "DM",
+              "DO",
+              "DZ",
+              "EC",
+              "EE",
+              "EG",
+              "EH",
+              "ER",
+              "ES",
+              "ET",
+              "FI",
+              "FJ",
+              "FK",
+              "FM",
+              "FO",
+              "FR",
+              "GA",
+              "GB",
+              "GD",
+              "GE",
+              "GF",
+              "GG",
+              "GH",
+              "GI",
+              "GL",
+              "GM",
+              "GN",
+              "GP",
+              "GQ",
+              "GR",
+              "GS",
+              "GT",
+              "GU",
+              "GW",
+              "GY",
+              "HK",
+              "HM",
+              "HN",
+              "HR",
+              "HT",
+              "HU",
+              "ID",
+              "IE",
+              "IL",
+              "IM",
+              "IN",
+              "IO",
+              "IQ",
+              "IR",
+              "IS",
+              "IT",
+              "JE",
+              "JM",
+              "JO",
+              "JP",
+              "KE",
+              "KG",
+              "KH",
+              "KI",
+              "KM",
+              "KN",
+              "KP",
+              "KR",
+              "KW",
+              "KY",
+              "KZ",
+              "LA",
+              "LB",
+              "LC",
+              "LI",
+              "LK",
+              "LR",
+              "LS",
+              "LT",
+              "LU",
+              "LV",
+              "LY",
+              "MA",
+              "MC",
+              "MD",
+              "ME",
+              "MF",
+              "MG",
+              "MH",
+              "MK",
+              "ML",
+              "MM",
+              "MN",
+              "MO",
+              "MP",
+              "MQ",
+              "MR",
+              "MS",
+              "MT",
+              "MU",
+              "MV",
+              "MW",
+              "MX",
+              "MY",
+              "MZ",
+              "NA",
+              "NC",
+              "NE",
+              "NF",
+              "NG",
+              "NI",
+              "NL",
+              "NO",
+              "NP",
+              "NR",
+              "NU",
+              "NZ",
+              "OM",
+              "PA",
+              "PE",
+              "PF",
+              "PG",
+              "PH",
+              "PK",
+              "PL",
+              "PM",
+              "PN",
+              "PR",
+              "PS",
+              "PT",
+              "PW",
+              "PY",
+              "QA",
+              "RE",
+              "RO",
+              "RS",
+              "RU",
+              "RW",
+              "SA",
+              "SB",
+              "SC",
+              "SD",
+              "SE",
+              "SG",
+              "SH",
+              "SI",
+              "SJ",
+              "SK",
+              "SL",
+              "SM",
+              "SN",
+              "SO",
+              "SR",
+              "SS",
+              "ST",
+              "SV",
+              "SX",
+              "SY",
+              "SZ",
+              "TC",
+              "TD",
+              "TF",
+              "TG",
+              "TH",
+              "TJ",
+              "TK",
+              "TL",
+              "TM",
+              "TN",
+              "TO",
+              "TR",
+              "TT",
+              "TV",
+              "TW",
+              "TZ",
+              "UA",
+              "UG",
+              "UM",
+              "US",
+              "UY",
+              "UZ",
+              "VA",
+              "VC",
+              "VE",
+              "VG",
+              "VI",
+              "VN",
+              "VU",
+              "WF",
+              "WS",
+              "YE",
+              "YT",
+              "ZA",
+              "ZM",
+              "ZW"
+            ],
+            "title": "CountryAlpha2",
+            "examples": [
+              "US",
+              "SE",
+              "FR"
+            ],
+            "x-speakeasy-enums": [
+              "AD",
+              "AE",
+              "AF",
+              "AG",
+              "AI",
+              "AL",
+              "AM",
+              "AO",
+              "AQ",
+              "AR",
+              "AS",
+              "AT",
+              "AU",
+              "AW",
+              "AX",
+              "AZ",
+              "BA",
+              "BB",
+              "BD",
+              "BE",
+              "BF",
+              "BG",
+              "BH",
+              "BI",
+              "BJ",
+              "BL",
+              "BM",
+              "BN",
+              "BO",
+              "BQ",
+              "BR",
+              "BS",
+              "BT",
+              "BV",
+              "BW",
+              "BY",
+              "BZ",
+              "CA",
+              "CC",
+              "CD",
+              "CF",
+              "CG",
+              "CH",
+              "CI",
+              "CK",
+              "CL",
+              "CM",
+              "CN",
+              "CO",
+              "CR",
+              "CU",
+              "CV",
+              "CW",
+              "CX",
+              "CY",
+              "CZ",
+              "DE",
+              "DJ",
+              "DK",
+              "DM",
+              "DO",
+              "DZ",
+              "EC",
+              "EE",
+              "EG",
+              "EH",
+              "ER",
+              "ES",
+              "ET",
+              "FI",
+              "FJ",
+              "FK",
+              "FM",
+              "FO",
+              "FR",
+              "GA",
+              "GB",
+              "GD",
+              "GE",
+              "GF",
+              "GG",
+              "GH",
+              "GI",
+              "GL",
+              "GM",
+              "GN",
+              "GP",
+              "GQ",
+              "GR",
+              "GS",
+              "GT",
+              "GU",
+              "GW",
+              "GY",
+              "HK",
+              "HM",
+              "HN",
+              "HR",
+              "HT",
+              "HU",
+              "ID",
+              "IE",
+              "IL",
+              "IM",
+              "IN",
+              "IO",
+              "IQ",
+              "IR",
+              "IS",
+              "IT",
+              "JE",
+              "JM",
+              "JO",
+              "JP",
+              "KE",
+              "KG",
+              "KH",
+              "KI",
+              "KM",
+              "KN",
+              "KP",
+              "KR",
+              "KW",
+              "KY",
+              "KZ",
+              "LA",
+              "LB",
+              "LC",
+              "LI",
+              "LK",
+              "LR",
+              "LS",
+              "LT",
+              "LU",
+              "LV",
+              "LY",
+              "MA",
+              "MC",
+              "MD",
+              "ME",
+              "MF",
+              "MG",
+              "MH",
+              "MK",
+              "ML",
+              "MM",
+              "MN",
+              "MO",
+              "MP",
+              "MQ",
+              "MR",
+              "MS",
+              "MT",
+              "MU",
+              "MV",
+              "MW",
+              "MX",
+              "MY",
+              "MZ",
+              "NA",
+              "NC",
+              "NE",
+              "NF",
+              "NG",
+              "NI",
+              "NL",
+              "NO",
+              "NP",
+              "NR",
+              "NU",
+              "NZ",
+              "OM",
+              "PA",
+              "PE",
+              "PF",
+              "PG",
+              "PH",
+              "PK",
+              "PL",
+              "PM",
+              "PN",
+              "PR",
+              "PS",
+              "PT",
+              "PW",
+              "PY",
+              "QA",
+              "RE",
+              "RO",
+              "RS",
+              "RU",
+              "RW",
+              "SA",
+              "SB",
+              "SC",
+              "SD",
+              "SE",
+              "SG",
+              "SH",
+              "SI",
+              "SJ",
+              "SK",
+              "SL",
+              "SM",
+              "SN",
+              "SO",
+              "SR",
+              "SS",
+              "ST",
+              "SV",
+              "SX",
+              "SY",
+              "SZ",
+              "TC",
+              "TD",
+              "TF",
+              "TG",
+              "TH",
+              "TJ",
+              "TK",
+              "TL",
+              "TM",
+              "TN",
+              "TO",
+              "TR",
+              "TT",
+              "TV",
+              "TW",
+              "TZ",
+              "UA",
+              "UG",
+              "UM",
+              "US",
+              "UY",
+              "UZ",
+              "VA",
+              "VC",
+              "VE",
+              "VG",
+              "VI",
+              "VN",
+              "VU",
+              "WF",
+              "WS",
+              "YE",
+              "YT",
+              "ZA",
+              "ZM",
+              "ZW"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "country"
+        ],
+        "title": "Address"
+      },
+      "BenefitLicenseKeyActivationCreateProperties": {
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "maximum": 2147483647.0,
+            "minimum": -2147483648.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Limit"
+          },
+          "enable_customer_admin": {
+            "type": "boolean",
+            "title": "Enable Customer Admin"
+          }
+        },
+        "type": "object",
+        "required": [
+          "limit",
+          "enable_customer_admin"
+        ],
+        "title": "BenefitLicenseKeyActivationCreateProperties"
+      },
+      "BenefitLicenseKeyActivationProperties": {
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "enable_customer_admin": {
+            "type": "boolean",
+            "title": "Enable Customer Admin"
+          }
+        },
+        "type": "object",
+        "required": [
+          "limit",
+          "enable_customer_admin"
+        ],
+        "title": "BenefitLicenseKeyActivationProperties"
+      },
+      "BenefitLicenseKeyExpirationProperties": {
+        "properties": {
+          "ttl": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Ttl"
+          },
+          "timeframe": {
+            "type": "string",
+            "enum": [
+              "year",
+              "month",
+              "day"
+            ],
+            "title": "Timeframe"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ttl",
+          "timeframe"
+        ],
+        "title": "BenefitLicenseKeyExpirationProperties"
+      },
+      "BenefitLicenseKeys": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Id",
+            "description": "The ID of the benefit."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "Creation timestamp of the object.",
+            "examples": [
+              "2026-01-01T00:00:00.000000Z"
+            ]
+          },
+          "modified_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "examples": [
+                  "2026-01-01T00:00:00.000000Z"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modified At",
+            "description": "Last modification timestamp of the object."
+          },
+          "type": {
+            "type": "string",
+            "const": "license_keys",
+            "title": "Type"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "description": "The description of the benefit."
+          },
+          "selectable": {
+            "type": "boolean",
+            "title": "Selectable",
+            "description": "Whether the benefit is selectable when creating a product."
+          },
+          "deletable": {
+            "type": "boolean",
+            "title": "Deletable",
+            "description": "Whether the benefit is deletable."
+          },
+          "is_deleted": {
+            "type": "boolean",
+            "title": "Is Deleted",
+            "description": "Whether the benefit is deleted."
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Organization Id",
+            "description": "The ID of the organization owning the benefit."
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/MetadataOutputType"
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/BenefitVisibility",
+            "description": "The visibility of the benefit in the customer portal."
+          },
+          "properties": {
+            "$ref": "#/components/schemas/BenefitLicenseKeysProperties"
+          },
+          "visibility_configurable": {
+            "type": "boolean",
+            "title": "Visibility Configurable",
+            "readOnly": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "modified_at",
+          "type",
+          "description",
+          "selectable",
+          "deletable",
+          "is_deleted",
+          "organization_id",
+          "metadata",
+          "visibility",
+          "properties",
+          "visibility_configurable"
+        ],
+        "title": "BenefitLicenseKeys"
+      },
+      "BenefitLicenseKeysCreate": {
+        "properties": {
+          "metadata": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500,
+                  "minLength": 1
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            },
+            "propertyNames": {
+              "maxLength": 40,
+              "minLength": 1
+            },
+            "type": "object",
+            "maxProperties": 50,
+            "title": "Metadata",
+            "description": "Key-value object allowing you to store additional information.\n\nThe key must be a string with a maximum length of **40 characters**.\nThe value must be either:\n\n* A string with a maximum length of **500 characters**\n* An integer\n* A floating-point number\n* A boolean\n\nYou can store up to **50 key-value pairs**."
+          },
+          "type": {
+            "type": "string",
+            "const": "license_keys",
+            "title": "Type"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 42,
+            "minLength": 3,
+            "title": "Description",
+            "description": "The description of the benefit. Will be displayed on products having this benefit."
+          },
+          "organization_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid4",
+                "description": "The organization ID.",
+                "examples": [
+                  "1dbfc517-0bbf-4301-9ba8-555ca42b9737"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Id",
+            "description": "The ID of the organization owning the benefit. **Required unless you use an organization token.**"
+          },
+          "visibility": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BenefitVisibility"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The visibility of the benefit in the customer portal."
+          },
+          "properties": {
+            "$ref": "#/components/schemas/BenefitLicenseKeysCreateProperties"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "description",
+          "properties"
+        ],
+        "title": "BenefitLicenseKeysCreate"
+      },
+      "BenefitLicenseKeysCreateProperties": {
+        "properties": {
+          "prefix": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prefix"
+          },
+          "expires": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BenefitLicenseKeyExpirationProperties"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "activations": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BenefitLicenseKeyActivationCreateProperties"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "limit_usage": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 2147483647.0,
+                "minimum": -2147483648.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Usage"
+          }
+        },
+        "type": "object",
+        "title": "BenefitLicenseKeysCreateProperties"
+      },
+      "BenefitLicenseKeysProperties": {
+        "properties": {
+          "prefix": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prefix"
+          },
+          "expires": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BenefitLicenseKeyExpirationProperties"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "activations": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BenefitLicenseKeyActivationProperties"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "limit_usage": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Usage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "prefix",
+          "expires",
+          "activations",
+          "limit_usage"
+        ],
+        "title": "BenefitLicenseKeysProperties"
+      },
+      "BenefitVisibility": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "private",
+          "public"
+        ],
+        "title": "Visibility"
+      },
+      "CustomerType": {
+        "type": "string",
+        "enum": [
+          "individual",
+          "team"
+        ],
+        "title": "CustomerType"
+      },
+      "LicenseKeyActivationBase": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Id"
+          },
+          "license_key_id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "License Key Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "meta": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Meta"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "examples": [
+              "2026-01-01T00:00:00.000000Z"
+            ]
+          },
+          "modified_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "examples": [
+                  "2026-01-01T00:00:00.000000Z"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modified At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "license_key_id",
+          "label",
+          "meta",
+          "created_at",
+          "modified_at"
+        ],
+        "title": "LicenseKeyActivationBase"
+      },
+      "LicenseKeyCustomer": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Id",
+            "description": "The ID of the customer.",
+            "examples": [
+              "992fae2a-2a17-4b7a-8d9e-e287cf90131b"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "Creation timestamp of the object.",
+            "examples": [
+              "2026-01-01T00:00:00.000000Z"
+            ]
+          },
+          "modified_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "examples": [
+                  "2026-01-01T00:00:00.000000Z"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modified At",
+            "description": "Last modification timestamp of the object."
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/MetadataOutputType"
+          },
+          "external_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Id",
+            "description": "The ID of the customer in your system. This must be unique within the organization. Once set, it can't be updated.",
+            "examples": [
+              "usr_1337"
+            ]
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email",
+            "description": "The email address of the customer. This must be unique within the organization.",
+            "examples": [
+              "customer@example.com"
+            ]
+          },
+          "email_verified": {
+            "type": "boolean",
+            "title": "Email Verified",
+            "description": "Whether the customer email address is verified. The address is automatically verified when the customer accesses the customer portal using their email address.",
+            "examples": [
+              true
+            ]
+          },
+          "type": {
+            "$ref": "#/components/schemas/CustomerType",
+            "description": "The type of customer: 'individual' for single users, 'team' for customers with multiple members.",
+            "examples": [
+              "individual"
+            ]
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "The name of the customer.",
+            "examples": [
+              "John Doe"
+            ]
+          },
+          "billing_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Billing Name",
+            "description": "The name that should appear on the customer's invoices. Falls back to the customer name when not explicitly set.",
+            "examples": [
+              "John Doe"
+            ]
+          },
+          "billing_address": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Address"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tax_id": {
+            "anyOf": [
+              {
+                "prefixItems": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TaxIDFormat"
+                  }
+                ],
+                "type": "array",
+                "maxItems": 2,
+                "minItems": 2,
+                "examples": [
+                  [
+                    "911144442",
+                    "us_ein"
+                  ],
+                  [
+                    "FR61954506077",
+                    "eu_vat"
+                  ]
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tax Id"
+          },
+          "locale": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locale"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Organization Id",
+            "description": "The ID of the organization owning the customer.",
+            "examples": [
+              "1dbfc517-0bbf-4301-9ba8-555ca42b9737"
+            ]
+          },
+          "default_payment_method_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid4"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Payment Method Id",
+            "description": "The ID of the customer's default payment method, if any. Use the payment methods endpoint to retrieve its details."
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "examples": [
+                  "2026-01-01T00:00:00.000000Z"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted At",
+            "description": "Timestamp for when the customer was soft deleted."
+          },
+          "first_user_event_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "examples": [
+                  "2026-01-01T00:00:00.000000Z"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First User Event At",
+            "description": "Timestamp of the first event ingested for this customer. Can predate `created_at`, and is null if no event was ever ingested."
+          },
+          "avatar_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avatar Url",
+            "examples": [
+              "https://www.gravatar.com/avatar/xxx?d=404"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "modified_at",
+          "metadata",
+          "email_verified",
+          "type",
+          "name",
+          "billing_name",
+          "billing_address",
+          "tax_id",
+          "organization_id",
+          "deleted_at",
+          "first_user_event_at",
+          "avatar_url"
+        ],
+        "title": "LicenseKeyCustomer"
+      },
+      "LicenseKeyRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Id",
+            "description": "The ID of the object."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "Creation timestamp of the object.",
+            "examples": [
+              "2026-01-01T00:00:00.000000Z"
+            ]
+          },
+          "modified_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "examples": [
+                  "2026-01-01T00:00:00.000000Z"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modified At",
+            "description": "Last modification timestamp of the object."
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Organization Id"
+          },
+          "customer_id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Customer Id"
+          },
+          "customer": {
+            "$ref": "#/components/schemas/LicenseKeyCustomer"
+          },
+          "benefit_id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Benefit Id",
+            "description": "The benefit ID."
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "display_key": {
+            "type": "string",
+            "title": "Display Key"
+          },
+          "status": {
+            "$ref": "#/components/schemas/LicenseKeyStatus"
+          },
+          "limit_activations": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Activations"
+          },
+          "usage": {
+            "type": "integer",
+            "title": "Usage"
+          },
+          "limit_usage": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Usage"
+          },
+          "validations": {
+            "type": "integer",
+            "title": "Validations"
+          },
+          "last_validated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "examples": [
+                  "2026-01-01T00:00:00.000000Z"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Validated At"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "examples": [
+                  "2026-01-01T00:00:00.000000Z"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "modified_at",
+          "organization_id",
+          "customer_id",
+          "customer",
+          "benefit_id",
+          "key",
+          "display_key",
+          "status",
+          "limit_activations",
+          "usage",
+          "limit_usage",
+          "validations",
+          "last_validated_at",
+          "expires_at"
+        ],
+        "title": "LicenseKeyRead"
+      },
+      "LicenseKeyStatus": {
+        "type": "string",
+        "enum": [
+          "granted",
+          "revoked",
+          "disabled"
+        ],
+        "title": "LicenseKeyStatus"
+      },
+      "LicenseKeyWithActivations": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Id",
+            "description": "The ID of the object."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "Creation timestamp of the object.",
+            "examples": [
+              "2026-01-01T00:00:00.000000Z"
+            ]
+          },
+          "modified_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "examples": [
+                  "2026-01-01T00:00:00.000000Z"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modified At",
+            "description": "Last modification timestamp of the object."
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Organization Id"
+          },
+          "customer_id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Customer Id"
+          },
+          "customer": {
+            "$ref": "#/components/schemas/LicenseKeyCustomer"
+          },
+          "benefit_id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Benefit Id",
+            "description": "The benefit ID."
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "display_key": {
+            "type": "string",
+            "title": "Display Key"
+          },
+          "status": {
+            "$ref": "#/components/schemas/LicenseKeyStatus"
+          },
+          "limit_activations": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Activations"
+          },
+          "usage": {
+            "type": "integer",
+            "title": "Usage"
+          },
+          "limit_usage": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Usage"
+          },
+          "validations": {
+            "type": "integer",
+            "title": "Validations"
+          },
+          "last_validated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "examples": [
+                  "2026-01-01T00:00:00.000000Z"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Validated At"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "examples": [
+                  "2026-01-01T00:00:00.000000Z"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "activations": {
+            "items": {
+              "$ref": "#/components/schemas/LicenseKeyActivationBase"
+            },
+            "type": "array",
+            "title": "Activations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "modified_at",
+          "organization_id",
+          "customer_id",
+          "customer",
+          "benefit_id",
+          "key",
+          "display_key",
+          "status",
+          "limit_activations",
+          "usage",
+          "limit_usage",
+          "validations",
+          "last_validated_at",
+          "expires_at",
+          "activations"
+        ],
+        "title": "LicenseKeyWithActivations"
+      },
+      "MetadataOutputType": {
+        "additionalProperties": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            }
+          ]
+        },
+        "type": "object"
+      },
+      "TaxIDFormat": {
+        "type": "string",
+        "enum": [
+          "ad_nrt",
+          "ae_trn",
+          "ar_cuit",
+          "au_abn",
+          "au_arn",
+          "bg_uic",
+          "bh_vat",
+          "bo_tin",
+          "br_cnpj",
+          "br_cpf",
+          "ca_bn",
+          "ca_gst_hst",
+          "ca_pst_bc",
+          "ca_pst_mb",
+          "ca_pst_sk",
+          "ca_qst",
+          "ch_uid",
+          "ch_vat",
+          "cl_tin",
+          "cn_tin",
+          "co_nit",
+          "cr_tin",
+          "de_stn",
+          "do_rcn",
+          "ec_ruc",
+          "eg_tin",
+          "es_cif",
+          "eu_oss_vat",
+          "eu_vat",
+          "gb_vat",
+          "ge_vat",
+          "hk_br",
+          "hr_oib",
+          "hu_tin",
+          "id_npwp",
+          "il_vat",
+          "in_gst",
+          "is_vat",
+          "jp_cn",
+          "jp_rn",
+          "jp_trn",
+          "ke_pin",
+          "kr_brn",
+          "kz_bin",
+          "li_uid",
+          "mk_vat",
+          "mx_rfc",
+          "my_frp",
+          "my_itn",
+          "my_sst",
+          "ng_tin",
+          "no_vat",
+          "no_voec",
+          "nz_gst",
+          "om_vat",
+          "pe_ruc",
+          "ph_tin",
+          "ro_tin",
+          "rs_pib",
+          "ru_inn",
+          "ru_kpp",
+          "sa_vat",
+          "sg_gst",
+          "sg_uen",
+          "si_tin",
+          "sv_nit",
+          "th_vat",
+          "tr_tin",
+          "tw_vat",
+          "ua_vat",
+          "us_ein",
+          "uy_ruc",
+          "ve_rif",
+          "vn_tin",
+          "za_vat",
+          "mu_tan"
+        ],
+        "title": "TaxIDFormat",
+        "description": "List of supported tax ID formats.\n\nRef: https://docs.stripe.com/billing/customer/tax-ids#supported-tax-id"
+      }
+    }
+  }
+}

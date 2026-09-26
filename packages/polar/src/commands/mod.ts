@@ -5,6 +5,10 @@ import {
   commands as webhookCommands,
 } from './webhooks.ts';
 import {
+  type Commands as LicenseKeyCommands,
+  commands as licenseKeyCommands,
+} from './license_keys.ts';
+import {
   createCustomer,
   type CreateInput,
   createInput,
@@ -17,7 +21,7 @@ import { createKey } from '../auth/keys.ts';
 type Operation<I, O> = ReturnType<
   typeof defineCommand<z.ZodType<I, I>, z.ZodType<O, O>>
 >;
-export type Commands = WebhookCommands & {
+export type Commands = WebhookCommands & LicenseKeyCommands & {
   'customers.create': Operation<CreateInput, Customer>;
   'customers.get': Operation<{ id: string }, Customer>;
   'keys.create': Operation<Record<string, never>, { apiKey: string }>;
@@ -25,6 +29,7 @@ export type Commands = WebhookCommands & {
 
 export const commands: Commands = {
   ...webhookCommands,
+  ...licenseKeyCommands,
   'customers.create': defineCommand({
     description:
       'Create an organization customer and record customer.created atomically',

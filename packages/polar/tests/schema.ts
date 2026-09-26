@@ -9,13 +9,17 @@ export interface Document {
   components: { schemas: Record<string, Schema> };
 }
 
-const excerpt = new URL(
-  './fixtures/polar-2026-04-customers.openapi.json',
-  import.meta.url,
-);
+const excerpts = {
+  customers: './fixtures/polar-2026-04-customers.openapi.json',
+  'license-keys': './fixtures/polar-2026-04-license-keys.openapi.json',
+};
 
-export async function readExcerpt(): Promise<Document> {
-  return JSON.parse(await Deno.readTextFile(excerpt)) as Document;
+export async function readExcerpt(
+  name: keyof typeof excerpts = 'customers',
+): Promise<Document> {
+  return JSON.parse(
+    await Deno.readTextFile(new URL(excerpts[name], import.meta.url)),
+  ) as Document;
 }
 
 /** The declared property names of an object schema, in declaration order. */
@@ -107,6 +111,20 @@ export function validate(
       typeof schema.minLength === 'number' && value.length < schema.minLength
     ) {
       return fail('shorter than minLength');
+    }
+  }
+
+  if (typeof value === 'number') {
+    for (
+      const [bound, broken] of [
+        ['minimum', (limit: number) => value < limit],
+        ['maximum', (limit: number) => value > limit],
+        ['exclusiveMinimum', (limit: number) => value <= limit],
+      ] as const
+    ) {
+      if (typeof schema[bound] === 'number' && broken(schema[bound])) {
+        return fail(`outside ${bound}`);
+      }
     }
   }
 

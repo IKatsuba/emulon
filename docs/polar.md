@@ -225,12 +225,37 @@ client is a consumer test dependency: it is absent from the published plugin and
 core packages, together with its `standardwebhooks` verifier, and no registry or
 provider is contacted during verification.
 
+## License keys
+
+Local management commands create a `license_keys` benefit, grant it to an
+existing customer of the same organization and manage the resulting key, as
+[ADR 0038](decisions/0038-polar-license-keys.md) describes. They are not Polar
+HTTP endpoints and record no `benefit_grant.*` event.
+
+```sh
+emulon billing benefits create --description 'Chorded Pro' \
+  --limit-activations 3 --enable-customer-admin --json
+emulon billing license-keys grant --benefit-id <uuid> --customer-id <uuid> --json
+emulon billing license-keys list --json
+emulon billing license-keys get --id <uuid> --json
+emulon billing license-keys update --id <uuid> --status revoked --json
+emulon billing license-keys deactivate --id <uuid> --activation-id <uuid> --json
+emulon billing license-keys inspect --id <uuid> --json
+```
+
+`grant`, `list`, `get` and `update` return Polar's `LicenseKeyRead` with the
+full `key`, which is a credential. `inspect` shows `display_key`, counters,
+limits and live activation IDs only; failures, status and events never carry the
+key. Paired flags go together: `--limit-activations` with
+`--enable-customer-admin`, `--ttl` with `--timeframe`.
+
 ## Not emulated
 
-Products, prices, checkouts, orders, subscriptions, benefits, license keys, the
-customer portal, payment methods, refunds, listing, updating and deleting
-customers are unsupported, and so are team customers, metadata, billing
-addresses, tax IDs and locales. This is a customer integration emulator, not a
-payment or licensing simulator. Every limitation has a stable ID in the
+Products, prices, checkouts, orders, subscriptions, the customer portal
+(including license key activation and validation), the authenticated benefit,
+benefit-grant and license-key APIs, payment methods, refunds, listing, updating
+and deleting customers are unsupported, and so are team customers, metadata,
+billing addresses, tax IDs and locales. This is a customer integration emulator,
+not a payment or licensing simulator. Every limitation has a stable ID in the
 manifest, and no comparison with a live Polar account was made
 (`liveProviderCompared: false`).

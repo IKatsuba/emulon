@@ -161,7 +161,7 @@ export function conflict(
   return null;
 }
 
-async function organizationId(tx: Transaction): Promise<string> {
+export async function organizationId(tx: Transaction): Promise<string> {
   const value = await tx.get(organizationCollection, organizationRow);
   const parsed = z.object({ id: z.uuid() }).safeParse(value);
 

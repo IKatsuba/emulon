@@ -141,7 +141,7 @@ export const compatibility: CompatibilityManifest = defineCompatibility({
     {
       'id': 'polar.limitation.1',
       'description':
-        'Only customer creation and reading; products, prices, checkouts, orders, subscriptions, benefits, license keys, customer portal, payment methods, refunds, lists, updates and deletion are unsupported',
+        'Only customer creation and reading over HTTP; products, prices, checkouts, orders, subscriptions, the customer portal including license key activation and validation, the authenticated benefit, benefit-grant and license-key APIs, benefit_grant events, payment methods, refunds, lists, updates and deletion are unsupported. License key benefits, grants, status changes and activation release exist only as local management commands',
     },
     {
       'id': 'polar.limitation.2',
@@ -193,6 +193,11 @@ export const compatibility: CompatibilityManifest = defineCompatibility({
         'Interrupted sends are not recovered automatically: they end failed with an unknown outcome and a manual redelivery is required, which is itself refused while an automatic attempt is queued or in flight',
     },
     {
+      'id': 'polar.limitation.13',
+      'description':
+        'Local license_keys benefits always report selectable, deletable and visibility_configurable true, is_deleted false, visibility public and empty metadata; product attachment, visibility and deletion are not implemented',
+    },
+    {
       'id': 'polar.limitation.9',
       'description':
         'Credentials are checked before the Polar-Version header, so an unauthorized request with an unsupported version returns 401',
@@ -237,6 +242,8 @@ export const compatibility: CompatibilityManifest = defineCompatibility({
     'liveProviderCompared': false,
   },
   'details': {
+    'licenseKeys':
+      'Local management commands benefits.create and licenseKeys.grant, list, get, update, deactivate and inspect act on the instance organization only; grant generates an uppercase random UUID4 key behind the optional benefit prefix and returns it in full as LicenseKeyRead does, while inspection, errors, status and events never carry it; customers and benefits of another organization are not found; no benefit_grant event is recorded',
     'schema':
       'Pinned Polar OpenAPI 2026-04 at commit 5514f6a85e9e856857f8662a58d1deb69bc4a2fd, SHA-256 616cd5bad20b9170be8ba0640c9d729009b5dbd39c29e9ede928d36ea21fd0d6; the selected excerpt is retained in packages/polar/tests/fixtures/polar-2026-04-customers.openapi.json',
     'organization':

@@ -18,7 +18,8 @@ export class PolarError extends DomainError {
       | 'ResourceNotFound'
       | 'UnsupportedOperation'
       | 'Unauthorized'
-      | 'CustomerAlreadyExists',
+      | 'CustomerAlreadyExists'
+      | 'NotPermitted',
     detail: string,
   ) {
     super(code, detail);
