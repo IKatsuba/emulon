@@ -9,6 +9,7 @@ import {
   organizationId,
 } from './customers.ts';
 import { PolarError } from './errors.ts';
+import { canonicalUuid } from './portal.ts';
 
 type Store = PluginContext['store'];
 type Transaction = Parameters<Parameters<Store['transaction']>[0]>[0];
@@ -704,7 +705,8 @@ async function keyByValue(
   value: string,
 ): Promise<StoredKey> {
   const organization = await organizationId(tx);
-  const key = supplied === organization
+  // Both sides are UUIDs; Polar compares them as values, not as text.
+  const key = canonicalUuid(supplied) === canonicalUuid(organization)
     ? (await keys(tx)).find((candidate) =>
       candidate.organization_id === organization &&
       sameKey(candidate.key, value)
@@ -766,5 +768,181 @@ export function activateLicenseKey(
     });
 
     return { ...toActivation(activation), license_key: await project(tx, key) };
+  });
+}
+
+/** `ValidatedLicenseKey`: the key as read, plus the named activation or null. */
+export type ValidatedLicenseKey = LicenseKey & {
+  activation: Activation | null;
+};
+
+export const validatedLicenseKeySchema: z.ZodType<
+  ValidatedLicenseKey,
+  ValidatedLicenseKey
+> = storedKeyObject.extend({
+  customer: customerSchema,
+  activation: activationSchema.nullable(),
+});
+
+/**
+ * Whole-object JSON equality: the same members with the same JSON values in
+ * any member order. A number never equals a boolean or a string here.
+ */
+export function sameConditions(a: Metadata, b: Metadata): boolean {
+  const names = Object.keys(a);
+
+  return names.length === Object.keys(b).length &&
+    names.every((name) => Object.hasOwn(b, name) && a[name] === b[name]);
+}
+
+export interface Validation {
+  activationId: string | null;
+  benefitId: string | null;
+  customerId: string | null;
+  incrementUsage: number | null;
+  conditions: Metadata;
+}
+
+function mismatch(detail: string): PolarError {
+  return new PolarError(404, 'ResourceNotFound', detail);
+}
+
+/**
+ * The validate refusals of ADR 0038 after key lookup, in Polar's order:
+ * status, expiry, activation lookup, nonempty conditions, benefit, customer
+ * and usage allowance. The found activation is returned for the projection.
+ */
+export function validationRefusal(
+  key: StoredKey,
+  activations: readonly StoredActivation[],
+  request: Validation,
+  now: number,
+): { refusal: PolarError } | { activation: StoredActivation | null } {
+  if (key.status !== 'granted') {
+    return { refusal: mismatch('License key is no longer active.') };
+  }
+
+  if (isExpired(key, now)) {
+    return { refusal: mismatch('License key has expired.') };
+  }
+
+  let activation: StoredActivation | null = null;
+
+  if (request.activationId !== null) {
+    activation = live(key, activations).find((candidate) =>
+      canonicalUuid(candidate.id) === request.activationId
+    ) ?? null;
+
+    if (activation === null) {
+      return { refusal: mismatch('Not found') };
+    }
+
+    if (
+      Object.keys(activation.conditions).length > 0 &&
+      !sameConditions(activation.conditions, request.conditions)
+    ) {
+      return {
+        refusal: mismatch('License key does not match required conditions'),
+      };
+    }
+  }
+
+  if (
+    request.benefitId !== null &&
+    request.benefitId !== canonicalUuid(key.benefit_id)
+  ) {
+    return { refusal: mismatch('License key does not match given benefit.') };
+  }
+
+  if (
+    request.customerId !== null &&
+    request.customerId !== canonicalUuid(key.customer_id)
+  ) {
+    return { refusal: mismatch('License key does not match given user.') };
+  }
+
+  if (
+    request.incrementUsage !== null && request.incrementUsage > 0 &&
+    key.limit_usage !== null
+  ) {
+    const remaining = key.limit_usage - key.usage;
+
+    if (request.incrementUsage > remaining) {
+      return {
+        refusal: new PolarError(
+          400,
+          'BadRequest',
+          `License key only has ${remaining} more usages.`,
+        ),
+      };
+    }
+  }
+
+  return { activation };
+}
+
+/** The counters a successful validation leaves behind. */
+export function validated(
+  key: StoredKey,
+  incrementUsage: number | null,
+  now: number,
+): StoredKey {
+  return {
+    ...key,
+    usage: key.usage +
+      (incrementUsage !== null && incrementUsage > 0 ? incrementUsage : 0),
+    validations: key.validations + 1,
+    last_validated_at: new Date(now).toISOString(),
+  };
+}
+
+/**
+ * Lookup, refusal checks and counter writes share one serialized transaction,
+ * so concurrent validations neither lose an increment nor overrun the usage
+ * limit. A refusal writes nothing.
+ */
+export function validateLicenseKey(
+  store: Store,
+  input: { key: string; organizationId: string } & Validation,
+  now: () => number = Date.now,
+): Promise<ValidatedLicenseKey> {
+  return store.transaction(async (tx) => {
+    const key = await keyByValue(tx, input.organizationId, input.key);
+    const at = now();
+    const outcome = validationRefusal(key, await activations(tx), input, at);
+
+    if ('refusal' in outcome) {
+      throw outcome.refusal;
+    }
+
+    const updated = validated(key, input.incrementUsage, at);
+
+    await tx.put({ collection: keyCollection, id: key.id, value: updated });
+
+    return {
+      ...await project(tx, updated),
+      activation: outcome.activation === null
+        ? null
+        : toActivation(outcome.activation),
+    };
+  });
+}
+
+/**
+ * Frees one live activation of the key named by value. Polar rechecks neither
+ * status nor expiry here, so a revoked or expired key can still release one.
+ */
+export function releaseActivation(
+  store: Store,
+  input: { key: string; organizationId: string; activationId: string },
+  now: () => number = Date.now,
+): Promise<void> {
+  return store.transaction(async (tx) => {
+    const key = await keyByValue(tx, input.organizationId, input.key);
+
+    // Activation IDs are generated lowercase, the canonical form of a request.
+    if (!await release(tx, key, input.activationId, now())) {
+      throw mismatch('Not found');
+    }
   });
 }

@@ -23,6 +23,7 @@ import { properties, readExcerpt, validate } from './schema.ts';
 import { customerCases, organizationId } from './customers_cases.ts';
 import { cases as webhookCases } from './webhook_cases.ts';
 import { cases as parityCases } from './parity_cases.ts';
+import { cases as licenseKeyCases } from './license_keys_cases.ts';
 import { assert, equal, rejects } from './assert.ts';
 
 const excerpt = await readExcerpt();
@@ -300,7 +301,12 @@ Deno.test('Polar declares the emulated capabilities exactly once', () => {
   equal(definition.name, compatibility.plugin);
 });
 
-const contractCases = [...customerCases, ...webhookCases, ...parityCases];
+const contractCases = [
+  ...customerCases,
+  ...webhookCases,
+  ...parityCases,
+  ...licenseKeyCases,
+];
 
 verifyCoverage(compatibility, contractCases);
 

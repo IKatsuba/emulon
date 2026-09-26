@@ -1,13 +1,17 @@
 {
   "x-emulon-attribution": {
-    "description": "Minimal excerpt of the Polar OpenAPI 2026-04 schema, retained for local contract tests only. License-key benefit, key and activation schemas are copied verbatim; everything outside the selected slice is removed.",
+    "description": "Minimal excerpt of the Polar OpenAPI 2026-04 schema, retained for local contract tests only. License-key benefit, key and activation schemas and the public customer-portal license-key paths are copied verbatim; everything outside the selected slice is removed. The pinned document's 400 response refers to a BadRequest schema it does not define, so none is retained.",
     "source": "https://raw.githubusercontent.com/polarsource/polar/5514f6a85e9e856857f8662a58d1deb69bc4a2fd/docs/openapi/2026-04.openapi.json",
     "repository": "https://github.com/polarsource/polar",
     "commit": "5514f6a85e9e856857f8662a58d1deb69bc4a2fd",
     "sha256": "616cd5bad20b9170be8ba0640c9d729009b5dbd39c29e9ede928d36ea21fd0d6",
     "retrieved": "2026-09-26",
     "selection": {
-      "paths": [],
+      "paths": [
+        "/v1/customer-portal/license-keys/activate",
+        "/v1/customer-portal/license-keys/validate",
+        "/v1/customer-portal/license-keys/deactivate"
+      ],
       "schemas": [
         "Address",
         "BenefitLicenseKeyActivationCreateProperties",
@@ -19,13 +23,23 @@
         "BenefitLicenseKeysProperties",
         "BenefitVisibility",
         "CustomerType",
+        "GrantedLicenseKey",
+        "HTTPValidationError",
+        "LicenseKeyActivate",
         "LicenseKeyActivationBase",
+        "LicenseKeyActivationCreated",
         "LicenseKeyCustomer",
+        "LicenseKeyDeactivate",
         "LicenseKeyRead",
         "LicenseKeyStatus",
+        "LicenseKeyValidate",
         "LicenseKeyWithActivations",
         "MetadataOutputType",
-        "TaxIDFormat"
+        "NotPermitted",
+        "ResourceNotFound",
+        "TaxIDFormat",
+        "ValidatedLicenseKey",
+        "ValidationError"
       ]
     }
   },
@@ -36,7 +50,222 @@
     "description": "Read the docs at https://polar.sh/docs/api-reference",
     "version": "2026-04"
   },
-  "paths": {},
+  "paths": {
+    "/v1/customer-portal/license-keys/activate": {
+      "post": {
+        "tags": [
+          "customer_portal",
+          "license_keys",
+          "public"
+        ],
+        "summary": "Activate License Key",
+        "description": "Activate a license key instance.\n\n> This endpoint doesn't require authentication and can be safely used on a public\n> client, like a desktop application or a mobile app.\n> If you plan to validate a license key on a server, use the `/v1/license-keys/activate`\n> endpoint instead.",
+        "operationId": "customer_portal:license_keys:activate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LicenseKeyActivate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LicenseKeyActivationCreated"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "License key is revoked, disabled, or expired, does not support activations, or has reached its activation limit. Use /validate for licenses without activations.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotPermitted"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "License key not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResourceNotFound"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-mint": {
+          "content": "<Tip>\n  You only need to use this endpoint if you have device **activations** enabled on the license key benefit. You then use this endpoint to reserve an allocation for a specific device. Store the unique activation ID from the response on the device and use it as extra validation in the [/validate](/api-reference/customer_portal/validate-license-key) endpoint.\n\n  Not using **activations**? Just use the [/validate](/api-reference/customer_portal/validate-license-key) endpoint directly instead.\n</Tip>"
+        },
+        "x-speakeasy-group": "license_keys",
+        "x-speakeasy-name-override": "activate",
+        "x-codeSamples": [
+          {
+            "lang": "python",
+            "source": "from polar.v2026_04 import Polar\n\npolar = Polar(\"polar_oat_xxx\")\n\nresponse = polar.customer_portal.license_keys.activate(\n    key='string',\n    organization_id='00000000-0000-4000-8000-000000000000',\n    label='string',\n)\nprint(response)\n"
+          },
+          {
+            "lang": "typescript",
+            "source": "import { createPolar } from \"@polar-sh/sdk/2026-04\";\n\nconst polar = createPolar({\n  accessToken: \"polar_oat_xxx\",\n});\n\nconst response = await polar.customerPortal.licenseKeys.activate(\n  {\n    \"key\": \"string\",\n    \"organization_id\": \"00000000-0000-4000-8000-000000000000\",\n    \"label\": \"string\"\n  },\n);\nconsole.log(response);\n"
+          }
+        ]
+      }
+    },
+    "/v1/customer-portal/license-keys/validate": {
+      "post": {
+        "tags": [
+          "customer_portal",
+          "license_keys",
+          "public"
+        ],
+        "summary": "Validate License Key",
+        "description": "Validate a license key.\n\n> This endpoint doesn't require authentication and can be safely used on a public\n> client, like a desktop application or a mobile app.\n> If you plan to validate a license key on a server, use the `/v1/license-keys/validate`\n> endpoint instead.",
+        "operationId": "customer_portal:license_keys:validate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LicenseKeyValidate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidatedLicenseKey"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The requested usage increment exceeds the license key's remaining usage allowance.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "License key not found, revoked, disabled, or expired, or the supplied activation, conditions, benefit, or customer do not match.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResourceNotFound"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-speakeasy-group": "license_keys",
+        "x-speakeasy-name-override": "validate",
+        "x-codeSamples": [
+          {
+            "lang": "python",
+            "source": "from polar.v2026_04 import Polar\n\npolar = Polar(\"polar_oat_xxx\")\n\nresponse = polar.customer_portal.license_keys.validate(\n    key='string',\n    organization_id='00000000-0000-4000-8000-000000000000',\n)\nprint(response)\n"
+          },
+          {
+            "lang": "typescript",
+            "source": "import { createPolar } from \"@polar-sh/sdk/2026-04\";\n\nconst polar = createPolar({\n  accessToken: \"polar_oat_xxx\",\n});\n\nconst response = await polar.customerPortal.licenseKeys.validate(\n  {\n    \"key\": \"string\",\n    \"organization_id\": \"00000000-0000-4000-8000-000000000000\"\n  },\n);\nconsole.log(response);\n"
+          }
+        ]
+      }
+    },
+    "/v1/customer-portal/license-keys/deactivate": {
+      "post": {
+        "tags": [
+          "customer_portal",
+          "license_keys",
+          "public"
+        ],
+        "summary": "Deactivate License Key",
+        "description": "Deactivate a license key instance.\n\n> This endpoint doesn't require authentication and can be safely used on a public\n> client, like a desktop application or a mobile app.\n> If you plan to validate a license key on a server, use the `/v1/license-keys/deactivate`\n> endpoint instead.",
+        "operationId": "customer_portal:license_keys:deactivate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LicenseKeyDeactivate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "License key activation deactivated."
+          },
+          "404": {
+            "description": "License key or activation not found, or activation does not belong to the license key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResourceNotFound"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-speakeasy-group": "license_keys",
+        "x-speakeasy-name-override": "deactivate",
+        "x-codeSamples": [
+          {
+            "lang": "python",
+            "source": "from polar.v2026_04 import Polar\n\npolar = Polar(\"polar_oat_xxx\")\n\npolar.customer_portal.license_keys.deactivate(\n    key='string',\n    organization_id='00000000-0000-4000-8000-000000000000',\n    activation_id='00000000-0000-4000-8000-000000000000',\n)\n"
+          },
+          {
+            "lang": "typescript",
+            "source": "import { createPolar } from \"@polar-sh/sdk/2026-04\";\n\nconst polar = createPolar({\n  accessToken: \"polar_oat_xxx\",\n});\n\nawait polar.customerPortal.licenseKeys.deactivate(\n  {\n    \"key\": \"string\",\n    \"organization_id\": \"00000000-0000-4000-8000-000000000000\",\n    \"activation_id\": \"00000000-0000-4000-8000-000000000000\"\n  },\n);\n"
+          }
+        ]
+      }
+    }
+  },
   "components": {
     "schemas": {
       "Address": {
@@ -979,6 +1208,246 @@
         ],
         "title": "CustomerType"
       },
+      "GrantedLicenseKey": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Id",
+            "description": "The ID of the object."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "Creation timestamp of the object.",
+            "examples": [
+              "2026-01-01T00:00:00.000000Z"
+            ]
+          },
+          "modified_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "examples": [
+                  "2026-01-01T00:00:00.000000Z"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modified At",
+            "description": "Last modification timestamp of the object."
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Organization Id"
+          },
+          "customer_id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Customer Id"
+          },
+          "customer": {
+            "$ref": "#/components/schemas/LicenseKeyCustomer"
+          },
+          "benefit_id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Benefit Id",
+            "description": "The benefit ID."
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "display_key": {
+            "type": "string",
+            "title": "Display Key"
+          },
+          "status": {
+            "type": "string",
+            "const": "granted",
+            "title": "Status"
+          },
+          "limit_activations": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Activations"
+          },
+          "usage": {
+            "type": "integer",
+            "title": "Usage"
+          },
+          "limit_usage": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Usage"
+          },
+          "validations": {
+            "type": "integer",
+            "title": "Validations"
+          },
+          "last_validated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "examples": [
+                  "2026-01-01T00:00:00.000000Z"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Validated At"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "examples": [
+                  "2026-01-01T00:00:00.000000Z"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "modified_at",
+          "organization_id",
+          "customer_id",
+          "customer",
+          "benefit_id",
+          "key",
+          "display_key",
+          "status",
+          "limit_activations",
+          "usage",
+          "limit_usage",
+          "validations",
+          "last_validated_at",
+          "expires_at"
+        ],
+        "title": "GrantedLicenseKey"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "LicenseKeyActivate": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Organization Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "conditions": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500,
+                  "minLength": 1
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            },
+            "propertyNames": {
+              "maxLength": 40,
+              "minLength": 1
+            },
+            "type": "object",
+            "maxProperties": 50,
+            "title": "Conditions",
+            "description": "Key-value object allowing you to set conditions that must match when validating the license key.\n\nThe key must be a string with a maximum length of **40 characters**.\nThe value must be either:\n\n* A string with a maximum length of **500 characters**\n* An integer\n* A floating-point number\n* A boolean\n\nYou can store up to **50 key-value pairs**."
+          },
+          "meta": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500,
+                  "minLength": 1
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            },
+            "propertyNames": {
+              "maxLength": 40,
+              "minLength": 1
+            },
+            "type": "object",
+            "maxProperties": 50,
+            "title": "Meta",
+            "description": "Key-value object allowing you to store additional information about the activation\n\nThe key must be a string with a maximum length of **40 characters**.\nThe value must be either:\n\n* A string with a maximum length of **500 characters**\n* An integer\n* A floating-point number\n* A boolean\n\nYou can store up to **50 key-value pairs**."
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "organization_id",
+          "label"
+        ],
+        "title": "LicenseKeyActivate"
+      },
       "LicenseKeyActivationBase": {
         "properties": {
           "id": {
@@ -1049,6 +1518,81 @@
           "modified_at"
         ],
         "title": "LicenseKeyActivationBase"
+      },
+      "LicenseKeyActivationCreated": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Id"
+          },
+          "license_key_id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "License Key Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "meta": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Meta"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "examples": [
+              "2026-01-01T00:00:00.000000Z"
+            ]
+          },
+          "modified_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "examples": [
+                  "2026-01-01T00:00:00.000000Z"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modified At"
+          },
+          "license_key": {
+            "$ref": "#/components/schemas/GrantedLicenseKey"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "license_key_id",
+          "label",
+          "meta",
+          "created_at",
+          "modified_at",
+          "license_key"
+        ],
+        "title": "LicenseKeyActivationCreated"
       },
       "LicenseKeyCustomer": {
         "properties": {
@@ -1304,6 +1848,31 @@
         ],
         "title": "LicenseKeyCustomer"
       },
+      "LicenseKeyDeactivate": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Organization Id"
+          },
+          "activation_id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Activation Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "organization_id",
+          "activation_id"
+        ],
+        "title": "LicenseKeyDeactivate"
+      },
       "LicenseKeyRead": {
         "properties": {
           "id": {
@@ -1457,6 +2026,102 @@
           "disabled"
         ],
         "title": "LicenseKeyStatus"
+      },
+      "LicenseKeyValidate": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Organization Id"
+          },
+          "activation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid4"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activation Id"
+          },
+          "benefit_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid4",
+                "description": "The benefit ID."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benefit Id"
+          },
+          "customer_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid4"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Id"
+          },
+          "increment_usage": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Increment Usage"
+          },
+          "conditions": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500,
+                  "minLength": 1
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            },
+            "propertyNames": {
+              "maxLength": 40,
+              "minLength": 1
+            },
+            "type": "object",
+            "maxProperties": 50,
+            "title": "Conditions",
+            "description": "Key-value object allowing you to set conditions that must match when validating the license key.\n\nThe key must be a string with a maximum length of **40 characters**.\nThe value must be either:\n\n* A string with a maximum length of **500 characters**\n* An integer\n* A floating-point number\n* A boolean\n\nYou can store up to **50 key-value pairs**."
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "organization_id"
+        ],
+        "title": "LicenseKeyValidate"
       },
       "LicenseKeyWithActivations": {
         "properties": {
@@ -1630,6 +2295,50 @@
         },
         "type": "object"
       },
+      "NotPermitted": {
+        "properties": {
+          "error": {
+            "type": "string",
+            "const": "NotPermitted",
+            "title": "Error",
+            "examples": [
+              "NotPermitted"
+            ]
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "error",
+          "detail"
+        ],
+        "title": "NotPermitted"
+      },
+      "ResourceNotFound": {
+        "properties": {
+          "error": {
+            "type": "string",
+            "const": "ResourceNotFound",
+            "title": "Error",
+            "examples": [
+              "ResourceNotFound"
+            ]
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "error",
+          "detail"
+        ],
+        "title": "ResourceNotFound"
+      },
       "TaxIDFormat": {
         "type": "string",
         "enum": [
@@ -1712,6 +2421,203 @@
         ],
         "title": "TaxIDFormat",
         "description": "List of supported tax ID formats.\n\nRef: https://docs.stripe.com/billing/customer/tax-ids#supported-tax-id"
+      },
+      "ValidatedLicenseKey": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Id",
+            "description": "The ID of the object."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "Creation timestamp of the object.",
+            "examples": [
+              "2026-01-01T00:00:00.000000Z"
+            ]
+          },
+          "modified_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "examples": [
+                  "2026-01-01T00:00:00.000000Z"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modified At",
+            "description": "Last modification timestamp of the object."
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Organization Id"
+          },
+          "customer_id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Customer Id"
+          },
+          "customer": {
+            "$ref": "#/components/schemas/LicenseKeyCustomer"
+          },
+          "benefit_id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Benefit Id",
+            "description": "The benefit ID."
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "display_key": {
+            "type": "string",
+            "title": "Display Key"
+          },
+          "status": {
+            "type": "string",
+            "const": "granted",
+            "title": "Status"
+          },
+          "limit_activations": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Activations"
+          },
+          "usage": {
+            "type": "integer",
+            "title": "Usage"
+          },
+          "limit_usage": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Usage"
+          },
+          "validations": {
+            "type": "integer",
+            "title": "Validations"
+          },
+          "last_validated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "examples": [
+                  "2026-01-01T00:00:00.000000Z"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Validated At"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "examples": [
+                  "2026-01-01T00:00:00.000000Z"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "activation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LicenseKeyActivationBase"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "modified_at",
+          "organization_id",
+          "customer_id",
+          "customer",
+          "benefit_id",
+          "key",
+          "display_key",
+          "status",
+          "limit_activations",
+          "usage",
+          "limit_usage",
+          "validations",
+          "last_validated_at",
+          "expires_at"
+        ],
+        "title": "ValidatedLicenseKey"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
       }
     }
   }

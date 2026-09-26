@@ -44,8 +44,8 @@ function captureConsole() {
 }
 
 /**
- * Part 1 has no public activation route, so live activations are written
- * while the host is stopped, through the same primitive the route will use.
+ * Live activations are written while the host is stopped, through the same
+ * primitive the public route uses, so the restart below has state to keep.
  */
 async function activateOffline(
   directory: string,

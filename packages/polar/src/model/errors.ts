@@ -19,7 +19,8 @@ export class PolarError extends DomainError {
       | 'UnsupportedOperation'
       | 'Unauthorized'
       | 'CustomerAlreadyExists'
-      | 'NotPermitted',
+      | 'NotPermitted'
+      | 'BadRequest',
     detail: string,
   ) {
     super(code, detail);

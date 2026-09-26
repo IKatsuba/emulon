@@ -22,11 +22,24 @@ import {
   listLicenseKeys,
   makeBenefit,
   makeKey,
+  sameConditions,
   sameKey,
+  type StoredActivation,
   type StoredKey,
   toActivation,
   updateLicenseKey,
+  validated,
+  validatedLicenseKeySchema,
+  validateLicenseKey,
+  validationRefusal,
 } from '../src/model/license_keys.ts';
+import {
+  canonicalUuid,
+  parseActivate,
+  parseDeactivate,
+  parseJson,
+  parseValidate,
+} from '../src/model/portal.ts';
 import { properties, readExcerpt, validate } from './schema.ts';
 import { organizationId } from './customers_cases.ts';
 import { assert, equal, rejects } from './assert.ts';
@@ -635,3 +648,321 @@ for (
     }
   });
 }
+
+Deno.test('Polar validated projection matches the pinned 2026-04 schema', () => {
+  const key = makeKey(
+    benefit(),
+    customer().id,
+    crypto.randomUUID(),
+    'K',
+    createdAt,
+  );
+  const value = validatedLicenseKeySchema.parse({
+    ...validated(key, 2, Date.parse(createdAt)),
+    customer: { ...customer(), id: key.customer_id },
+    activation: null,
+  });
+
+  equal(
+    Object.keys(value).sort(),
+    properties(excerpt, 'ValidatedLicenseKey').sort(),
+  );
+  equal(
+    validate(excerpt, '#/components/schemas/ValidatedLicenseKey', value),
+    [],
+  );
+  equal([value.validations, value.usage], [1, 2]);
+  equal(value.last_validated_at, createdAt);
+});
+
+Deno.test('Polar conditions compare as whole JSON objects', () => {
+  equal(sameConditions({}, {}), true);
+  equal(sameConditions({ a: 1, b: 'x' }, { b: 'x', a: 1 }), true);
+  equal(sameConditions({ a: 1 }, { a: 1, b: 2 }), false);
+  equal(sameConditions({ a: 1, b: 2 }, { a: 1 }), false);
+  equal(sameConditions({ a: 1 }, { a: '1' }), false);
+  equal(sameConditions({ a: 1 }, { a: true }), false);
+  equal(sameConditions({ a: false }, { b: false }), false);
+});
+
+Deno.test('Polar validation refusals follow the pinned order', () => {
+  const key: StoredKey = makeKey(
+    benefit({
+      description: 'Pro',
+      limitActivations: 1,
+      enableCustomerAdmin: false,
+      ttl: 1,
+      timeframe: 'day',
+      limitUsage: 2,
+    }),
+    crypto.randomUUID(),
+    crypto.randomUUID(),
+    'K',
+    createdAt,
+  );
+  const activation: StoredActivation = {
+    id: crypto.randomUUID(),
+    license_key_id: key.id,
+    label: 'mac',
+    meta: {},
+    conditions: { major_version: 2 },
+    created_at: createdAt,
+    modified_at: null,
+    deleted_at: null,
+  };
+  const now = Date.parse(createdAt);
+  const expired = Date.parse(key.expires_at!);
+  const everything = {
+    activationId: crypto.randomUUID(),
+    benefitId: crypto.randomUUID(),
+    customerId: crypto.randomUUID(),
+    incrementUsage: 3,
+    conditions: {},
+  };
+  const detail = (
+    outcome: ReturnType<typeof validationRefusal>,
+  ) =>
+    'refusal' in outcome
+      ? [outcome.refusal.status, outcome.refusal.code, outcome.refusal.message]
+      : outcome.activation?.id ?? null;
+
+  equal(
+    detail(
+      validationRefusal({ ...key, status: 'revoked' }, [], everything, expired),
+    ),
+    [404, 'ResourceNotFound', 'License key is no longer active.'],
+  );
+  equal(
+    detail(validationRefusal(key, [], everything, expired)),
+    [404, 'ResourceNotFound', 'License key has expired.'],
+  );
+  equal(
+    detail(validationRefusal(key, [activation], everything, now)),
+    [404, 'ResourceNotFound', 'Not found'],
+  );
+  equal(
+    detail(
+      validationRefusal(
+        key,
+        [{ ...activation, deleted_at: createdAt }],
+        { ...everything, activationId: activation.id },
+        now,
+      ),
+    ),
+    [404, 'ResourceNotFound', 'Not found'],
+  );
+  equal(
+    detail(
+      validationRefusal(key, [activation], {
+        ...everything,
+        activationId: activation.id,
+      }, now),
+    ),
+    [404, 'ResourceNotFound', 'License key does not match required conditions'],
+  );
+
+  const matching = {
+    ...everything,
+    activationId: activation.id,
+    conditions: { major_version: 2 },
+  };
+
+  equal(
+    detail(validationRefusal(key, [activation], matching, now)),
+    [404, 'ResourceNotFound', 'License key does not match given benefit.'],
+  );
+  equal(
+    detail(
+      validationRefusal(key, [activation], {
+        ...matching,
+        benefitId: key.benefit_id,
+      }, now),
+    ),
+    [404, 'ResourceNotFound', 'License key does not match given user.'],
+  );
+
+  const owned = {
+    ...matching,
+    benefitId: key.benefit_id,
+    customerId: key.customer_id,
+  };
+
+  equal(
+    detail(validationRefusal(key, [activation], owned, now)),
+    [400, 'BadRequest', 'License key only has 2 more usages.'],
+  );
+  equal(
+    detail(
+      validationRefusal(
+        key,
+        [activation],
+        { ...owned, incrementUsage: 2 },
+        now,
+      ),
+    ),
+    activation.id,
+  );
+  // Empty stored conditions impose no comparison.
+  equal(
+    detail(
+      validationRefusal(
+        key,
+        [{ ...activation, conditions: {} }],
+        { ...owned, incrementUsage: null, conditions: { any: 1 } },
+        now,
+      ),
+    ),
+    activation.id,
+  );
+  equal(
+    detail(
+      validationRefusal(key, [], {
+        activationId: null,
+        benefitId: null,
+        customerId: null,
+        incrementUsage: 0,
+        conditions: { ignored: true },
+      }, now),
+    ),
+    null,
+  );
+});
+
+Deno.test('Polar validation writes counters only on success, atomically', async () => {
+  const handle = await open();
+  const store = handle.store;
+  const created = await createBenefit(store, {
+    description: 'Metered',
+    limitUsage: 3,
+  });
+  const key = await grantLicenseKey(store, {
+    benefitId: created.id,
+    customerId: (await createCustomerRow(store)).id,
+  });
+  const input = {
+    key: key.key,
+    organizationId,
+    activationId: null,
+    benefitId: null,
+    customerId: null,
+    conditions: {},
+  };
+  const results = await Promise.allSettled(
+    Array.from(
+      { length: 5 },
+      () => validateLicenseKey(store, { ...input, incrementUsage: 1 }),
+    ),
+  );
+
+  equal(results.filter((result) => result.status === 'fulfilled').length, 3);
+
+  const after = await inspectLicenseKey(store, key.id);
+
+  equal([after.usage, after.validations], [3, 3]);
+  equal(
+    await refusal(() =>
+      validateLicenseKey(store, {
+        ...input,
+        organizationId: crypto.randomUUID(),
+        incrementUsage: null,
+      })
+    ),
+    { status: 404, code: 'ResourceNotFound', detail: 'Not found' },
+  );
+  equal((await inspectLicenseKey(store, key.id)).validations, 3);
+});
+
+async function createCustomerRow(
+  store: Awaited<ReturnType<typeof open>>['store'],
+) {
+  const row = { ...customer(), organization_id: organizationId };
+
+  await store.transaction((tx) =>
+    tx.put({ collection: 'customers', id: row.id, value: row })
+  );
+
+  return row;
+}
+
+Deno.test('Polar public request parsing mirrors Pydantic without echoing input', () => {
+  const organization = organizationId.toUpperCase();
+
+  equal(parseJson('  '), {
+    ok: false,
+    issues: [{ loc: ['body'], msg: 'Field required', type: 'missing' }],
+  });
+  equal(parseJson('null').ok, false);
+  equal(
+    canonicalUuid(organizationId.replaceAll('-', '').toUpperCase()),
+    organizationId,
+  );
+  equal(parseActivate({ key: 'K', organization_id: organization, label: '' }), {
+    ok: true,
+    value: {
+      key: 'K',
+      organization_id: organizationId,
+      label: '',
+      conditions: {},
+      meta: {},
+    },
+  });
+  equal(
+    parseValidate({
+      key: 'K',
+      organization_id: organizationId,
+      activation_id: null,
+      benefit_id: null,
+      customer_id: null,
+      increment_usage: null,
+      unknown: 'ignored',
+    }),
+    {
+      ok: true,
+      value: {
+        key: 'K',
+        organization_id: organizationId,
+        activation_id: null,
+        benefit_id: null,
+        customer_id: null,
+        increment_usage: null,
+        conditions: {},
+      },
+    },
+  );
+
+  const rejected = parseValidate({
+    key: null,
+    organization_id: 7,
+    increment_usage: 'SECRET',
+    conditions: { SECRET: null },
+  });
+
+  assert(!rejected.ok);
+  equal(rejected.issues, [
+    {
+      loc: ['body', 'key'],
+      msg: 'Input should be a valid string',
+      type: 'string_type',
+    },
+    {
+      loc: ['body', 'organization_id'],
+      msg: 'UUID input should be a string, bytes or UUID object',
+      type: 'uuid_type',
+    },
+    {
+      loc: ['body', 'increment_usage'],
+      msg: 'Input should be a valid integer',
+      type: 'int_type',
+    },
+    {
+      loc: ['body', 'conditions'],
+      msg: 'Input should be a valid string',
+      type: 'string_type',
+    },
+  ]);
+  assert(!JSON.stringify(rejected).includes('SECRET'), 'Input was echoed');
+  equal(
+    parseDeactivate({ key: 'K', organization_id: organizationId }).ok,
+    false,
+  );
+});

@@ -15,8 +15,7 @@ import {
   fromBody,
   getCustomer,
 } from '../model/customers.ts';
-
-const versionHeader = 'polar-version';
+import { isPublic, portalRoutes, versionHeader } from './license_keys.ts';
 
 function failure(error: unknown): Response {
   if (error instanceof PolarValidationError) {
@@ -50,6 +49,10 @@ export function issues(error: z.ZodError): ValidationIssue[] {
 
 export function routes(ctx: PluginContext, api: Hono) {
   const authenticate: MiddlewareHandler = async (c, next) => {
+    if (isPublic(c.req.method, c.req.path)) {
+      return next();
+    }
+
     if (
       !await authorized(
         ctx.store.scope(),
@@ -130,6 +133,7 @@ export function routes(ctx: PluginContext, api: Hono) {
   };
 
   api.use('*', authenticate);
+  portalRoutes(ctx, api);
   // FastAPI redirects the unslashed form upstream; both are accepted locally.
   api.post('/v1/customers', create);
   api.post('/v1/customers/', create);

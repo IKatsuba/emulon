@@ -249,10 +249,19 @@ limits and live activation IDs only; failures, status and events never carry the
 key. Paired flags go together: `--limit-activations` with
 `--enable-customer-admin`, `--ttl` with `--timeframe`.
 
+A desktop client uses the public customer-portal routes on the `api` endpoint:
+`POST /v1/customer-portal/license-keys/activate`, `/validate` and `/deactivate`.
+They read no token; the exact key together with the instance `organization_id`
+is the credential. Activation stores `conditions`, and validation with that
+`activation_id` requires the same JSON object. Refusals are Polar's exact
+`{ error, detail }` envelopes, checked in the order the ADR lists, and a body
+that fails validation returns `422 RequestValidationError` with `type`, `loc`
+and `msg` only, never the submitted key or conditions.
+
 ## Not emulated
 
-Products, prices, checkouts, orders, subscriptions, the customer portal
-(including license key activation and validation), the authenticated benefit,
+Products, prices, checkouts, orders, subscriptions, the customer portal other
+than license key activate, validate and deactivate, the authenticated benefit,
 benefit-grant and license-key APIs, payment methods, refunds, listing, updating
 and deleting customers are unsupported, and so are team customers, metadata,
 billing addresses, tax IDs and locales. This is a customer integration emulator,
