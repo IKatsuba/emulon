@@ -9,7 +9,7 @@ import {
 } from '../control/protocol.ts';
 import { serveEnvironment } from '../control/server.ts';
 import { onShutdown } from '../runtime/discovery.ts';
-import { type Configuration, loadConfig } from '../sdk/load.ts';
+import { ConfigError, type Configuration, loadConfig } from '../sdk/load.ts';
 import { runCLI } from './run.ts';
 
 export function selectEnvironment(args: readonly string[]) {
@@ -252,6 +252,8 @@ export async function runProjectCLI(
   } catch (error) {
     const failure = error instanceof CommandError
       ? error
+      : error instanceof ConfigError
+      ? new CommandError(error.code, error.message)
       : new CommandError('ENVIRONMENT_FAILED', 'Cannot access environment.');
 
     return {

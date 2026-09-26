@@ -3,7 +3,11 @@ import type { CompatibilityManifest, defineCommand } from 'emulon';
 import { definePlugin, destinationFixture } from 'emulon';
 import { type Commands, commands } from './commands/mod.ts';
 import { compatibility } from './compatibility.ts';
-import { fixtures, type Options } from './model/customers.ts';
+import {
+  configuredOrganization,
+  fixtures,
+  type Options,
+} from './model/customers.ts';
 import { routes } from './routes/customers.ts';
 import { subscriptionPolicy, transport } from './webhooks/mod.ts';
 
@@ -19,7 +23,7 @@ const polar: ReturnType<
       >;
     }
   >
-> = definePlugin<Options | undefined, Commands>({
+> = checked(definePlugin<Options | undefined, Commands>({
   name: '@emulon/polar',
   apiVersion: 1,
   compatibility,
@@ -54,6 +58,15 @@ const polar: ReturnType<
       stop: () => Promise.resolve(),
     };
   },
-});
+}));
+
+/** Rejects an unusable organization when the configuration is written. */
+function checked<F extends (options?: Options) => unknown>(factory: F): F {
+  return ((options?: Options) => {
+    configuredOrganization(options);
+
+    return factory(options);
+  }) as F;
+}
 
 export default polar;

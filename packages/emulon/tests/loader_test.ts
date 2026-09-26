@@ -1,6 +1,7 @@
 import { defineConfig, Emulon } from 'emulon';
 import resend from '@emulon/resend';
 import { runCLI } from '../src/cli/run.ts';
+import { runProjectCLI } from '../src/cli/project.ts';
 import { ConfigError } from '../src/sdk/load.ts';
 
 function assert(value: unknown): asserts value {
@@ -94,6 +95,12 @@ Deno.test('loader reports stable safe errors for import and shape failures', asy
     try {
       await Deno.writeTextFile(`${directory}/emulon.config.ts`, source!);
       await expectCode(() => Emulon.load(directory), code!);
+
+      const up = await runProjectCLI(['up', '--json'], undefined, directory);
+      const error = JSON.parse(up.stderr).error;
+
+      assert(up.code === 1 && error.code === code);
+      assert(!up.stderr.includes('secret-marker'));
     } finally {
       await Deno.remove(directory, { recursive: true });
     }

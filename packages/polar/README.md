@@ -108,9 +108,9 @@ with one command; [the guide](../../docs/polar.md#license-keys) describes it.
 
 ## Options
 
-`polar(options)` accepts a fixed `organizationId`, webhook `destinations` and
-customer `fixtures`; fixtures take part in email and external ID uniqueness and
-emit no events. Missing the `Polar-Version` header selects this pinned slice;
-any other value is rejected. Tests never reach Polar: the retained
-[schema excerpt](tests/fixtures/polar-2026-04-customers.openapi.json) carries
-its own attribution.
+`polar(options)` accepts a fixed `organizationId` (a version 4 UUID), webhook
+`destinations` and customer `fixtures`; fixtures take part in email and external
+ID uniqueness and emit no events. Missing the `Polar-Version` header selects
+this pinned slice; any other value is rejected. Tests never reach Polar: the
+retained [schema excerpt](tests/fixtures/polar-2026-04-customers.openapi.json)
+carries its own attribution.

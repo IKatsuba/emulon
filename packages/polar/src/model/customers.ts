@@ -246,15 +246,32 @@ export function getCustomer(store: Store, id: string): Promise<Customer> {
   });
 }
 
+/**
+ * The fixed organization option, lowercased. Public license-key bodies accept
+ * only a version 4 UUID of the RFC 4122 variant and compare it lowercased, so
+ * any other ID could never be named there.
+ */
+export function configuredOrganization(options?: Options): string | undefined {
+  if (options?.organizationId === undefined) {
+    return undefined;
+  }
+
+  const parsed = z.uuidv4().safeParse(options.organizationId);
+
+  if (!parsed.success) {
+    throw new Error(
+      'Invalid organization ID: expected a version 4 UUID (RFC 4122 variant).',
+    );
+  }
+
+  return parsed.data.toLowerCase();
+}
+
 /** Fixtures seed the organization and its customers and emit no events. */
 export function fixtures(
   options?: Options,
 ): { collection: string; id: string; value: unknown }[] {
-  const organization = options?.organizationId ?? crypto.randomUUID();
-
-  if (!z.uuid().safeParse(organization).success) {
-    throw new Error('Invalid organization ID.');
-  }
+  const organization = configuredOrganization(options) ?? crypto.randomUUID();
 
   const createdAt = new Date().toISOString();
   const ids = new Set<string>();

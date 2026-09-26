@@ -279,7 +279,8 @@ credential mode or public facility beyond this ADR.
   organization is otherwise a fresh local UUID, which a durable environment
   keeps across restarts but a fresh one regenerates; callers that need a fixed
   organization in assertions or fixtures set it. Invalid values fail at
-  configuration time.
+  configuration time; [ADR 0038](0038-polar-license-keys.md) narrows valid
+  values to version 4 UUIDs.
 - Credentials are checked before `Polar-Version`, matching the existing plugins.
   An unauthorized request with an unsupported version therefore returns 401, and
   the selected version header appears only on responses that passed both checks.
