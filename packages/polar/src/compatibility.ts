@@ -286,7 +286,7 @@ export const compatibility: CompatibilityManifest = defineCompatibility({
     {
       'id': 'polar.limitation.15',
       'description':
-        'Public request validation is a safe projection of Pydantic: each issue carries only type, loc and msg; loc stops at the metadata field without the member name; an invalid UUID reports uuid_parsing without the parser suffix; an invalid metadata value reports only the first union member; UUIDs are not checked for version 4; strings are not coerced to integers',
+        'Public request validation is a safe projection of Pydantic: each issue carries only type, loc and msg; loc stops at the metadata field without the member name; an invalid UUID reports uuid_parsing without the parser suffix; an invalid metadata value reports only the first union member; strings are not coerced to integers',
     },
     {
       'id': 'polar.limitation.9',

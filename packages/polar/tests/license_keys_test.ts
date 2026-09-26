@@ -965,4 +965,37 @@ Deno.test('Polar public request parsing mirrors Pydantic without echoing input',
     parseDeactivate({ key: 'K', organization_id: organizationId }).ok,
     false,
   );
+  equal(
+    parseDeactivate({ key: 'K', organization_id: null, activation_id: null }),
+    {
+      ok: false,
+      issues: ['organization_id', 'activation_id'].map((field) => ({
+        loc: ['body', field],
+        msg: 'UUID input should be a string, bytes or UUID object',
+        type: 'uuid_type',
+      })),
+    },
+  );
+  equal(
+    parseValidate({
+      key: 'K',
+      organization_id: organizationId,
+      customer_id: '01890A5D-AC96-774B-BCCE-B302099A8057',
+    }),
+    {
+      ok: false,
+      issues: [{
+        loc: ['body', 'customer_id'],
+        msg: 'UUID version 4 expected',
+        type: 'uuid_version',
+      }],
+    },
+  );
+  equal(
+    parseValidate({
+      key: 'K',
+      organization_id: organizationId.toUpperCase().replaceAll('-', ''),
+    }).ok,
+    true,
+  );
 });

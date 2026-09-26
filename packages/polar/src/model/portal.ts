@@ -132,16 +132,19 @@ class Reader {
       return '';
     }
 
-    return this.optionalUuid(field) ?? '';
+    return this.uuid4(field, this.body[field]) ?? '';
   }
 
   optionalUuid(field: string): string | null {
     const value = this.body[field];
 
-    if (value === undefined || value === null) {
-      return null;
-    }
+    return value === undefined || value === null
+      ? null
+      : this.uuid4(field, value);
+  }
 
+  /** Polar's request schemas declare `UUID4`; null is not a UUID. */
+  private uuid4(field: string, value: unknown): string | null {
     if (typeof value !== 'string') {
       return this.fail(
         field,
@@ -150,9 +153,16 @@ class Reader {
       );
     }
 
-    return uuidPattern.test(value)
-      ? canonicalUuid(value)
-      : this.fail(field, 'Input should be a valid UUID', 'uuid_parsing');
+    if (!uuidPattern.test(value)) {
+      return this.fail(field, 'Input should be a valid UUID', 'uuid_parsing');
+    }
+
+    const uuid = canonicalUuid(value);
+
+    // The version is the first digit of the third group.
+    return uuid[14] === '4'
+      ? uuid
+      : this.fail(field, 'UUID version 4 expected', 'uuid_version');
   }
 
   optionalCount(field: string): number | null {

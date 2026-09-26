@@ -1080,6 +1080,59 @@ register(
         loc: ['body', 'organization_id'],
         msg: 'Input should be a valid UUID',
       }]],
+      ['null organization', 'activate', {
+        key: secret,
+        organization_id: null,
+        label: 'x',
+      }, [{
+        type: 'uuid_type',
+        loc: ['body', 'organization_id'],
+        msg: 'UUID input should be a string, bytes or UUID object',
+      }]],
+      [
+        'null deactivate activation',
+        'deactivate',
+        body(secret, {
+          activation_id: null,
+        }),
+        [{
+          type: 'uuid_type',
+          loc: ['body', 'activation_id'],
+          msg: 'UUID input should be a string, bytes or UUID object',
+        }],
+      ],
+      ['version 1 organization UUID', 'validate', {
+        key: secret,
+        organization_id: 'c232ab00-9414-11ec-b3c8-9f6bdeced846',
+      }, [{
+        type: 'uuid_version',
+        loc: ['body', 'organization_id'],
+        msg: 'UUID version 4 expected',
+      }]],
+      [
+        'version 7 activation UUID',
+        'deactivate',
+        body(secret, {
+          activation_id: '01890a5d-ac96-774b-bcce-b302099a8057',
+        }),
+        [{
+          type: 'uuid_version',
+          loc: ['body', 'activation_id'],
+          msg: 'UUID version 4 expected',
+        }],
+      ],
+      [
+        'version 1 optional benefit UUID',
+        'validate',
+        body(secret, {
+          benefit_id: 'c232ab00-9414-11ec-b3c8-9f6bdeced846',
+        }),
+        [{
+          type: 'uuid_version',
+          loc: ['body', 'benefit_id'],
+          msg: 'UUID version 4 expected',
+        }],
+      ],
       ['non-string key', 'validate', body(42), [{
         type: 'string_type',
         loc: ['body', 'key'],
