@@ -81,7 +81,10 @@ const surfaces = definePlugin({
       execute: () => 'pong',
     }),
   },
-  async setup(ctx, options: { label: string; swallow?: boolean }) {
+  async setup(
+    ctx,
+    options: { label: string; swallow?: boolean; ignore?: boolean },
+  ) {
     const endpoints: Record<string, string> = {};
 
     for (const name of ['api', 'web']) {
@@ -94,6 +97,10 @@ const surfaces = definePlugin({
         endpoints[name] = await ctx.http.listen(name);
       } catch {
         // A plugin that hides the bind error must not hide the host verdict.
+        if (options.ignore) {
+          continue;
+        }
+
         throw new Error(options.swallow ? 'plugin failure' : 'secret-marker');
       }
     }
@@ -240,6 +247,34 @@ Deno.test('configuration rejects duplicate ports before any setup', async () => 
   assert(stopped.length === 0);
 });
 
+Deno.test('a CONFIG_INVALID thrown by project code keeps its message hidden', async () => {
+  const registration = surfaces({ label: 'billing' });
+  const config = {
+    services: {
+      billing: {
+        service: registration,
+        get ports(): Record<string, number> {
+          throw new DomainError('CONFIG_INVALID', 'secret-marker');
+        },
+      },
+    },
+  };
+
+  for (
+    const action of [
+      () => validateConfig(config),
+      () => Emulon.load(config),
+      () => Emulon.start(config),
+    ]
+  ) {
+    const error = await failure(action);
+
+    assert(error instanceof ConfigError, String(error));
+    assert(error.code === 'CONFIG_INVALID');
+    assert(error.message === 'Invalid Emulon configuration.', error.message);
+  }
+});
+
 for (const serve of [serveDeno, serveNode]) {
   Deno.test(`${serve.name} binds a requested loopback port and reports it in use`, async () => {
     const [port] = vacantPorts(1);
@@ -320,7 +355,9 @@ Deno.test('an occupied port fails startup with PORT_IN_USE and rolls back', asyn
   const port = foreign.addr.port;
 
   try {
-    for (const swallow of [false, true]) {
+    for (
+      const handling of [{}, { swallow: true }, { ignore: true }] as const
+    ) {
       stopped.length = 0;
 
       const error = await failure(() =>
@@ -331,7 +368,7 @@ Deno.test('an occupied port fails startup with PORT_IN_USE and rolls back', asyn
               ports: { api: first! },
             },
             code: {
-              service: surfaces({ label: 'code', swallow }),
+              service: surfaces({ label: 'code', ...handling }),
               ports: { web: port },
             },
           },
@@ -345,7 +382,11 @@ Deno.test('an occupied port fails startup with PORT_IN_USE and rolls back', asyn
           `Service instance "code" surface "web" cannot listen on port ${port} because it is already in use.`,
         error.message,
       );
-      assert(stopped.join() === 'first');
+      // A plugin that started without the surface is stopped as well.
+      assert(
+        stopped.join() === ('ignore' in handling ? 'code,first' : 'first'),
+        stopped.join(),
+      );
 
       let released = false;
 

@@ -1,7 +1,7 @@
 import { isDomainError } from '../commands/domain-error.ts';
 import { configExists, configURL } from '../runtime/project.ts';
 import { defineConfig } from './config.ts';
-import type { ServiceEntry } from './instances.ts';
+import { InstanceConfigError, type ServiceEntry } from './instances.ts';
 
 export type Configuration = { services: Record<string, ServiceEntry> };
 
@@ -20,9 +20,10 @@ export function validateConfig(value: unknown): Configuration {
   try {
     return defineConfig(value as Configuration);
   } catch (error) {
-    // Only a configuration verdict is safe to show; project code and other
-    // validation errors can contain credentials.
-    if (isDomainError(error) && error.code === 'CONFIG_INVALID') {
+    // Only the host's own port verdict is safe to show; project code, even a
+    // DomainError from a getter, and other validation errors can contain
+    // credentials.
+    if (error instanceof InstanceConfigError) {
       throw new ConfigError(error.code, error.message);
     }
 

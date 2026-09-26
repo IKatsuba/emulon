@@ -16,9 +16,19 @@ export interface Instance {
   readonly ports: ReadonlyMap<string, number>;
 }
 
+/**
+ * A verdict the host itself wrote; it names only instance and surface keys
+ * and ports. A DomainError thrown by project code, such as a getter, is not
+ * one, so the loader keeps hiding its message.
+ */
+export class InstanceConfigError extends DomainError {
+  constructor(message: string) {
+    super('CONFIG_INVALID', message);
+  }
+}
+
 function invalid(message: string): never {
-  // Host-generated verdicts name only instance and surface keys and ports.
-  throw new DomainError('CONFIG_INVALID', message);
+  throw new InstanceConfigError(message);
 }
 
 /** Unwraps one services value; the name only appears in safe verdicts. */

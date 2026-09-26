@@ -294,6 +294,12 @@ export async function startWithAdapter<const Config extends Configuration>(
 
       await entry.instance.ready();
 
+      // A plugin may swallow the bind error and start without that surface;
+      // a fixed port that did not bind still fails the whole environment.
+      if (entry.host.failure()) {
+        throw new Error('Port in use');
+      }
+
       // Plugins do not declare surfaces, so only a started instance can tell
       // that a configured port names none of them.
       unmatched = unmatchedSurfaces(ports, entry.host.listened())[0];

@@ -63,7 +63,10 @@ import. Use the existing branded `DomainError('CONFIG_INVALID', ...)` path for
 that case, and preserve the same safe verdict in direct validation rather than
 replacing it with a generic message. This extends
 [ADR 0003](0003-config-loader.md)'s handling of import-time configuration
-errors. Other project-code exceptions remain redacted.
+errors. Other project-code exceptions remain redacted; direct validation passes
+through only verdicts the host wrote itself, so a `CONFIG_INVALID` `DomainError`
+thrown by project code during validation, such as from a getter, keeps the
+generic message.
 
 The plugin contract does not statically declare surface names. The host
 therefore checks configured names against surfaces actually listened to during
@@ -79,9 +82,12 @@ a fixed port never falls back to another port. If the operating system reports
 that the port is occupied, startup fails with `PORT_IN_USE` and a safe message
 naming the instance, surface and requested port. The runtime adapter recognizes
 the native bind error; the environment preserves that code through rollback
-instead of replacing it with the general startup error. No endpoint or discovery
-record is published after failure, and previously started surfaces are closed as
-in ADR 0006. Other bind failures retain the existing redacted startup error.
+instead of replacing it with the general startup error. This holds even when the
+plugin catches the bind error and finishes setup without that surface: the host
+records the failure itself and rolls the environment back. No endpoint or
+discovery record is published after failure, and previously started surfaces are
+closed as in ADR 0006. Other bind failures retain the existing redacted startup
+error.
 
 The local control API remains a separate listener on dynamic port 0. The
 instance descriptor has no control API setting and does not alter discovery,
