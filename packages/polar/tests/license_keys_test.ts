@@ -998,4 +998,31 @@ Deno.test('Polar public request parsing mirrors Pydantic without echoing input',
     }).ok,
     true,
   );
+
+  for (const variant of ['0', '7', 'c', 'f']) {
+    equal(
+      parseValidate({
+        key: 'K',
+        organization_id: `00000000-0000-4000-${variant}000-000000000000`,
+      }),
+      {
+        ok: false,
+        issues: [{
+          loc: ['body', 'organization_id'],
+          msg: 'UUID version 4 expected',
+          type: 'uuid_version',
+        }],
+      },
+    );
+  }
+
+  for (const variant of ['8', '9', 'a', 'B']) {
+    equal(
+      parseValidate({
+        key: 'K',
+        organization_id: `00000000-0000-4000-${variant}000-000000000000`,
+      }).ok,
+      true,
+    );
+  }
 });

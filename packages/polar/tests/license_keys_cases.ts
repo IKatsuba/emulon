@@ -1122,6 +1122,18 @@ register(
         }],
       ],
       [
+        'version 4 digit outside the RFC 4122 variant',
+        'validate',
+        body(secret, {
+          organization_id: '00000000-0000-4000-0000-000000000000',
+        }),
+        [{
+          type: 'uuid_version',
+          loc: ['body', 'organization_id'],
+          msg: 'UUID version 4 expected',
+        }],
+      ],
+      [
         'version 1 optional benefit UUID',
         'validate',
         body(secret, {

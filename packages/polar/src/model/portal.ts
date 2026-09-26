@@ -159,8 +159,9 @@ class Reader {
 
     const uuid = canonicalUuid(value);
 
-    // The version is the first digit of the third group.
-    return uuid[14] === '4'
+    // Python's `UUID.version` is None outside the RFC 4122 variant, so a
+    // version digit of 4 counts only with variant bits 10 (8, 9, a or b).
+    return uuid[14] === '4' && '89ab'.includes(uuid.charAt(19))
       ? uuid
       : this.fail(field, 'UUID version 4 expected', 'uuid_version');
   }
