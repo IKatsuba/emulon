@@ -1,6 +1,6 @@
 {
   "name": "@emulon/resend",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "exports": "./src/mod.ts",
   "emulon": {
     "apiVersion": 1,
@@ -14,7 +14,7 @@
     ]
   },
   "peerDependencies": {
-    "emulon": "0.2.0",
+    "emulon": "0.3.0",
     "hono": "4.13.8"
   }
 }
