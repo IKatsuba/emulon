@@ -9,7 +9,7 @@ export default defineConfig({
 });
 `;
 
-const version = '0.1.2';
+const version = '0.2.0';
 const help =
   'Usage: emulon [--json] [--environment <name>] <command>\n\nCommands:\n  init       Create emulon.config.ts\n  add <name>... Install and configure plugins\n  up         Start a foreground environment\n  status     Show running service addresses\n  down       Stop the selected environment\n  events     List events (--type <type>, --follow)\n  reset      Restore fixtures and invalidate generated credentials\n\nOptions:\n  --help     Show help\n  --version  Show version\n  --json     Print structured output';
 

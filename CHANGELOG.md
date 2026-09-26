@@ -6,6 +6,8 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-26
+
 ### Added
 
 - `@emulon/polar`: `license_keys` benefits and granted license keys, managed by
