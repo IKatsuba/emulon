@@ -102,6 +102,18 @@ async function portal(api, operation, body) {
   };
 }
 
+/**
+ * Compares two license key records without ever printing the full key: a
+ * failed deep comparison would echo both objects to stderr.
+ */
+function assertSameLicenseKey(actual, expected) {
+  const { key: actualKey, ...actualRest } = actual;
+  const { key: expectedKey, ...expectedRest } = expected;
+
+  assert.ok(actualKey === expectedKey, `License key ${expected.id} changed`);
+  assert.deepEqual(actualRest, expectedRest);
+}
+
 const host = await up();
 let connected;
 
@@ -172,11 +184,11 @@ try {
     customerId: customer.id,
   });
 
-  assert.deepEqual(await service.licenseKeys.get({ id: fromCLI.id }), {
+  assertSameLicenseKey(await service.licenseKeys.get({ id: fromCLI.id }), {
     ...fromCLI,
     activations: [],
   });
-  assert.deepEqual(
+  assertSameLicenseKey(
     await cli('billing', 'license-keys', 'get', '--id', fromSDK.id),
     { ...fromSDK, activations: [] },
   );

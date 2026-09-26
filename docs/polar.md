@@ -356,7 +356,10 @@ Products, prices, checkouts, orders, subscriptions, the customer portal other
 than license key activate, validate and deactivate, the authenticated benefit,
 benefit-grant and license-key APIs, payment methods, refunds, listing, updating
 and deleting customers are unsupported, and so are team customers, metadata,
-billing addresses, tax IDs and locales. This is a customer integration emulator,
-not a payment or licensing simulator. Every limitation has a stable ID in the
-manifest, and no comparison with a live Polar account was made
+billing addresses, tax IDs and locales. License keys are emulated for a desktop
+client: benefits, grants and status changes exist only as local management
+commands, and over HTTP only the three public customer-portal calls answer, with
+Polar's activation limits, expiry, usage and stored conditions. This is a
+customer integration emulator, not a payment simulator. Every limitation has a
+stable ID in the manifest, and no comparison with a live Polar account was made
 (`liveProviderCompared: false`).
